@@ -272,7 +272,7 @@ if __name__ == '__main__':
         #args.valid_files = libri_path + "librivox-test-clean.csv"
 
 
-    assert(keras.__version__ == "2.0.4") ## CoreML is strict
+    # assert(keras.__version__ == "2.0.4") ## CoreML is strict
 
     print(args)
 
