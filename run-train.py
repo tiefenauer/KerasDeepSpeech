@@ -18,7 +18,7 @@ from keras.optimizers import Adam
 from generator import BatchGenerator, read_data_from_csv
 from model import *
 from report import ReportCallback
-from util.log_util import create_args_str
+from util.log_util import create_args_str, redirect_to_file
 from utils import load_model_checkpoint, save_model, MemoryCallback
 
 #######################################################
@@ -52,18 +52,22 @@ args = parser.parse_args()
 
 def main():
     output_dir = setup()
-    print(create_args_str(args))
-
     model = create_model(output_dir)
     opt = Adam(lr=args.learning_rate, beta_1=0.9, beta_2=0.999, epsilon=1e-8, clipnorm=5)
     model.compile(optimizer=opt, loss=ctc)
-
     train_model(model)
 
 
 def setup():
     if args.name == "":
         args.name = 'DS' + datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')
+
+    output_dir = join('checkpoints', 'results', f'model_{args.name}')
+    if not isdir(output_dir):
+        makedirs(output_dir)
+
+    log_file_path = join(output_dir, 'train.log')
+    redirect_to_file(log_file_path)
 
     # detect user here too
     if args.train_files == "" and args.valid_files == "":
@@ -74,10 +78,7 @@ def setup():
 
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
-    output_dir = join('checkpoints', 'results', f'model_{args.name}')
-    if not isdir(output_dir):
-        makedirs(output_dir)
-
+    print(create_args_str(args))
     return output_dir
 
 
