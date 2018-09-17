@@ -16,7 +16,7 @@ import socket
 
 from utils import *
 from generator import *
-from data import combine_all_wavs_and_trans_from_csvs
+from generator import read_data_from_csv
 from model import *
 from report import *
 
@@ -37,7 +37,7 @@ def main(args):
     '''
 
     print("Getting data from arguments")
-    test_dataprops, df_test = combine_all_wavs_and_trans_from_csvs(args.test_files, sortagrad=False)
+    test_dataprops, df_test = read_data_from_csv(args.test_files, sort=False)
 
 
     # check any special data model requirments e.g. a spectrogram

@@ -9,14 +9,12 @@ import datetime
 import wave
 from os import path
 
-import pandas as pd
 import pyaudio
 import speech_recognition as sr
 from model import *
 from report import *
 from utils import *
 
-from data import combine_all_wavs_and_trans_from_csvs
 from generator import *
 
 #####################################################
@@ -217,7 +215,7 @@ if __name__ == '__main__':
 
         args.test_files = "./live/live.csv"
         print("Getting data from arguments")
-        test_dataprops, df_test = combine_all_wavs_and_trans_from_csvs(args.test_files, sortagrad=False)
+        test_dataprops, df_test = read_data_from_csv(args.test_files, sort=False)
         ## x. init data generators
         print("Creating data batch generators")
         testdata = BatchGenerator(dataframe=df_test, dataproperties=test_dataprops,

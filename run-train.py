@@ -15,8 +15,7 @@ from os.path import join, abspath, isdir
 from keras.callbacks import TensorBoard
 from keras.optimizers import Adam
 
-from data import combine_all_wavs_and_trans_from_csvs
-from generator import BatchGenerator
+from generator import BatchGenerator, read_data_from_csv
 from model import *
 from report import ReportCallback
 from util.log_util import create_args_str
@@ -44,7 +43,7 @@ parser.add_argument('--model_path', type=str, default='',
                     help="""If value set, load the checkpoint in a folder minus name minus the extension (weights 
                        assumed as same name diff ext) e.g. --model_path ./checkpoints/ TRIMMED_ds_ctc_model/""")
 parser.add_argument('--learning_rate', type=float, default=0.01, help='the learning rate used by the optimiser')
-parser.add_argument('--sortagrad', type=bool, default=True, help='sort utterances by their length in the first epoch')
+parser.add_argument('--sorted', type=bool, default=True, help='sort utterances by their length in the first epoch')
 parser.add_argument('--epochs', type=int, default=20, help='Number of epochs to train the model')
 parser.add_argument('--batchsize', type=int, default=16, help='batch_size used to train the model')
 parser.add_argument('--gpu', type=str, nargs='?', default='2', help='(optional) GPU(s) to use for training. Default: 2')
@@ -100,16 +99,9 @@ def create_model(output_dir):
 
 
 def train_model(model):
-    print("Getting data from arguments")
-    train_dataprops, df_train = combine_all_wavs_and_trans_from_csvs(args.train_files, sortagrad=args.sortagrad)
-    valid_dataprops, df_valid = combine_all_wavs_and_trans_from_csvs(args.valid_files, sortagrad=args.sortagrad)
-
     print("Creating data batch generators")
-    data_train = BatchGenerator(df_train, dataproperties=train_dataprops, training=True, batch_size=args.batchsize)
-    data_valid = BatchGenerator(df_valid, dataproperties=valid_dataprops, training=False, batch_size=args.batchsize)
-
-    train_steps = args.train_steps or len(df_train.index) // args.batchsize
-    valid_steps = args.valid_steps or (len(df_valid.index) // args.batchsize)
+    data_train = BatchGenerator(args.train_files, sort=args.sorted, steps=args.train_steps, batch_size=args.batchsize)
+    data_valid = BatchGenerator(args.valid_files, sort=args.sorted, steps=args.valid_steps, batch_size=args.batchsize)
 
     cb_list = []
     if args.memcheck:
@@ -127,8 +119,8 @@ def train_model(model):
 
     cb_list.append(report_cb)
 
-    model.fit_generator(generator=data_train.next_batch(), steps_per_epoch=train_steps,
-                        validation_data=data_valid.next_batch(), validation_steps=valid_steps,
+    model.fit_generator(generator=data_train.next_batch(), steps_per_epoch=data_train.num_batches,
+                        validation_data=data_valid.next_batch(), validation_steps=data_valid.num_batches,
                         epochs=args.epochs,
                         callbacks=cb_list)
 

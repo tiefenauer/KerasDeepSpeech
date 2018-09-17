@@ -1,4 +1,8 @@
+import sys
+from genericpath import isfile
+
 import numpy as np
+import pandas as pd
 import python_speech_features as p
 import scipy.io.wavfile as wav
 import soundfile
@@ -11,41 +15,24 @@ from sklearn.utils import shuffle
 from utils import text_to_int_sequence
 
 
-# Data batch generator, responsible for providing the data to fit_generator
-
 class BatchGenerator(object):
-    def __init__(self, dataframe, dataproperties, training, batch_size=16):
-        self.training_data = training
-        self.model_input_type = 'mfcc'
-        self.df = dataframe.copy()
-        self.wavpath = self.df['wav_filename'].tolist()
-        self.transcript = self.df['transcript'].tolist()
-        self.finish = self.df['wav_filesize'].tolist()
-        self.start = np.zeros(len(self.finish))
-        self.length = self.finish
-        self.shuffling = True
-
+    def __init__(self, csv_path, sort, steps=0, batch_size=16):
         self.batch_size = batch_size
-        self.cur_index = 0
 
-        self.feats_std = 0
-        self.feats_mean = 0
-
-        self.set_of_all_int_outputs_used = None
-
-        # Free up memory of unneeded data
+        dataframe = read_data_from_csv(csv_path=csv_path, sort=sort)
+        self.wav_files = dataframe['wav_filename'].tolist()
+        self.wav_sizes = dataframe['wav_filesize'].tolist()
+        self.transcripts = dataframe['transcript'].tolist()
         del dataframe
-        del dataproperties
-        self.df = None
-        del self.df
 
-    def normalise(self, feature, eps=1e-14):
-        return (feature - self.feats_mean) / (self.feats_std + eps)
+        self.shuffling = True
+        self.cur_index = 0
+        self.num_batches = steps or len(dataframe.index) // batch_size
 
     def get_batch(self, idx):
 
-        batch_x = self.wavpath[idx * self.batch_size:(idx + 1) * self.batch_size]
-        batch_y_trans = self.transcript[idx * self.batch_size:(idx + 1) * self.batch_size]
+        batch_x = self.wav_files[idx * self.batch_size:(idx + 1) * self.batch_size]
+        batch_y_trans = self.transcripts[idx * self.batch_size:(idx + 1) * self.batch_size]
 
         try:
             assert (len(batch_x) == self.batch_size)
@@ -56,41 +43,25 @@ class BatchGenerator(object):
             print(batch_y_trans)
 
         # 1. X_data (the MFCC's for the batch)
-        # 0. get the maximum time length of the batch
         x_val = [get_max_time(file_name) for file_name in batch_x]
         max_val = max(x_val)
         # print("Max batch time value is:", max_val)
 
         X_data = np.array([make_mfcc_shape(file_name, padlen=max_val) for file_name in batch_x])
         assert (X_data.shape == (self.batch_size, max_val, 26))
-        # print("1. X_data shape:", X_data.shape)
-        # print("1. X_data:", X_data)
 
         # 2. labels (made numerical)
-        # get max label length
         y_val = [get_maxseq_len(l) for l in batch_y_trans]
-        # print(y_val)
         max_y = max(y_val)
-        # print(max_y)
         labels = np.array([get_intseq(l, max_intseq_length=max_y) for l in batch_y_trans])
-        # print("2. labels shape:", labels.shape)
-        # print("2. labels values=", labels)
         assert (labels.shape == (self.batch_size, max_y))
 
         # 3. input_length (required for CTC loss)
-        # this is the time dimension of CTC (batch x time x mfcc)
-        # input_length = np.array([get_xsize(mfcc) for mfcc in X_data])
         input_length = np.array(x_val)
-        # print("3. input_length shape:", input_length.shape)
-        # print("3. input_length =", input_length)
         assert (input_length.shape == (self.batch_size,))
 
         # 4. label_length (required for CTC loss)
-        # this is the length of the number of label of a sequence
-        # label_length = np.array([len(l) for l in labels])
         label_length = np.array(y_val)
-        # print("4. label_length shape:", label_length.shape)
-        # print("4. label_length =", label_length)
         assert (label_length.shape == (self.batch_size,))
 
         # 5. source_str (used for human readable output on callback)
@@ -110,9 +81,9 @@ class BatchGenerator(object):
 
     def next_batch(self):
         while 1:
-            assert (self.batch_size <= len(self.wavpath))
+            assert (self.batch_size <= len(self.wav_files))
 
-            if (self.cur_index + 1) * self.batch_size >= len(self.wavpath) - self.batch_size:
+            if (self.cur_index + 1) * self.batch_size >= len(self.wav_files) - self.batch_size:
 
                 self.cur_index = 0
 
@@ -132,9 +103,9 @@ class BatchGenerator(object):
             yield ret
 
     def genshuffle(self):
-        self.wavpath, self.transcript, self.finish = shuffle(self.wavpath,
-                                                             self.transcript,
-                                                             self.finish)
+        self.wav_files, self.transcripts, self.wav_sizes = shuffle(self.wav_files,
+                                                                   self.transcripts,
+                                                                   self.wav_sizes)
 
     def export_test_mfcc(self):
         # this is used to export data e.g. into iOS
@@ -376,3 +347,24 @@ def featurise(audio_clip):
     return spectrogram_from_file(
         audio_clip, step=step, window=window,
         max_freq=max_freq)
+
+
+def read_data_from_csv(csv_path, sort=True, createwordlist=False):
+    if not isfile(csv_path):
+        print(f'ERROR: CSV file {csv_path} does not exist!', file=sys.stderr)
+        exit(0)
+
+    print(f'Reading data from {csv_path}...')
+    df = pd.read_csv(csv_path, sep=',', encoding='utf-8')
+    print("...done!")
+
+    # can output the word list here if required
+    if createwordlist:
+        df['transcript'].to_csv("./lm/df_all_word_list.csv", sep=',', header=False, index=False)  # reorder + out
+
+    print("Total number of samples:", len(df.index))
+
+    if sort:
+        df = df.sort_values(by='wav_filesize', ascending=True)
+
+    return df.reset_index(drop=True)
