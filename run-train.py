@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+os.environ['CUDA_VISIBLE_DEVICES'] = "2"
 
 '''
 

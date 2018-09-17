@@ -18,3 +18,5 @@ data/*
 !e00*
 !live-rec-test.py
 !data-recorder.py
+/checkpoints/
+/tensorboard/
