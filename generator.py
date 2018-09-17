@@ -1,31 +1,23 @@
-
 import numpy as np
-from numpy.lib.stride_tricks import as_strided
-from sklearn.utils import shuffle
-
 import python_speech_features as p
 import scipy.io.wavfile as wav
 import soundfile
-import scipy
 from aubio import source, pvoc, mfcc
-from numpy import vstack, zeros, diff
-
-
-
-
 from keras.preprocessing.sequence import pad_sequences
+from numpy import vstack, zeros
+from numpy.lib.stride_tricks import as_strided
+from sklearn.utils import shuffle
 
 from utils import text_to_int_sequence
+
 
 # Data batch generator, responsible for providing the data to fit_generator
 
 class BatchGenerator(object):
-    def __init__(self, dataframe, dataproperties, training, batch_size=16, model_input_type="mfcc"):
+    def __init__(self, dataframe, dataproperties, training, batch_size=16):
         self.training_data = training
-        self.model_input_type = model_input_type ##mfcc, mfcc-aubio, spectrogram, spectrogram-img
-        # self.aubio = False
+        self.model_input_type = 'mfcc'
         self.df = dataframe.copy()
-        #['wav_filesize','transcript','wav_filename']
         self.wavpath = self.df['wav_filename'].tolist()
         self.transcript = self.df['transcript'].tolist()
         self.finish = self.df['wav_filesize'].tolist()
@@ -41,7 +33,7 @@ class BatchGenerator(object):
 
         self.set_of_all_int_outputs_used = None
 
-        #Free up memory of unneeded data
+        # Free up memory of unneeded data
         del dataframe
         del dataproperties
         self.df = None
@@ -64,33 +56,15 @@ class BatchGenerator(object):
             print(batch_y_trans)
 
         # 1. X_data (the MFCC's for the batch)
-        if(self.model_input_type == "spectrogram"):
-            # 0. get the maximum time length of the batch
-            x_val = [get_max_specto_time(file_name) for file_name in batch_x]
-            max_val = max(x_val)
-            # print("Max batch time value is:", max_val)
-            X_data = np.array([make_specto_shape(file_name, padlen=max_val) for file_name in batch_x])
-            assert (X_data.shape == (self.batch_size, max_val, 161))
+        # 0. get the maximum time length of the batch
+        x_val = [get_max_time(file_name) for file_name in batch_x]
+        max_val = max(x_val)
+        # print("Max batch time value is:", max_val)
 
-        elif(self.model_input_type == "mfcc-aubio"):
-            x_val = [get_max_aubio(file_name) for file_name in batch_x]
-            max_val = max(x_val)
-            # print("Max batch time value is:", max_val)
-            X_data = np.array([make_aubio_shape(file_name, padlen=max_val) for file_name in batch_x])
-            # print(X_data.shape)
-            assert (X_data.shape == (self.batch_size, max_val, 26))
-
-        elif(self.model_input_type == "mfcc"):
-            # 0. get the maximum time length of the batch
-            x_val = [get_max_time(file_name) for file_name in batch_x]
-            max_val = max(x_val)
-            # print("Max batch time value is:", max_val)
-
-            X_data = np.array([make_mfcc_shape(file_name, padlen=max_val) for file_name in batch_x])
-            assert (X_data.shape == (self.batch_size, max_val, 26))
+        X_data = np.array([make_mfcc_shape(file_name, padlen=max_val) for file_name in batch_x])
+        assert (X_data.shape == (self.batch_size, max_val, 26))
         # print("1. X_data shape:", X_data.shape)
         # print("1. X_data:", X_data)
-
 
         # 2. labels (made numerical)
         # get max label length
@@ -101,28 +75,26 @@ class BatchGenerator(object):
         labels = np.array([get_intseq(l, max_intseq_length=max_y) for l in batch_y_trans])
         # print("2. labels shape:", labels.shape)
         # print("2. labels values=", labels)
-        assert(labels.shape == (self.batch_size, max_y))
+        assert (labels.shape == (self.batch_size, max_y))
 
         # 3. input_length (required for CTC loss)
         # this is the time dimension of CTC (batch x time x mfcc)
-        #input_length = np.array([get_xsize(mfcc) for mfcc in X_data])
+        # input_length = np.array([get_xsize(mfcc) for mfcc in X_data])
         input_length = np.array(x_val)
         # print("3. input_length shape:", input_length.shape)
         # print("3. input_length =", input_length)
-        assert(input_length.shape == (self.batch_size,))
+        assert (input_length.shape == (self.batch_size,))
 
         # 4. label_length (required for CTC loss)
         # this is the length of the number of label of a sequence
-        #label_length = np.array([len(l) for l in labels])
+        # label_length = np.array([len(l) for l in labels])
         label_length = np.array(y_val)
         # print("4. label_length shape:", label_length.shape)
         # print("4. label_length =", label_length)
-        assert(label_length.shape == (self.batch_size,))
+        assert (label_length.shape == (self.batch_size,))
 
         # 5. source_str (used for human readable output on callback)
         source_str = np.array([l for l in batch_y_trans])
-
-
 
         inputs = {
             'the_input': X_data,
@@ -134,7 +106,7 @@ class BatchGenerator(object):
 
         outputs = {'ctc': np.zeros([self.batch_size])}
 
-        return (inputs, outputs)
+        return inputs, outputs
 
     def next_batch(self):
         while 1:
@@ -144,7 +116,7 @@ class BatchGenerator(object):
 
                 self.cur_index = 0
 
-                if(self.shuffling==True):
+                if self.shuffling == True:
                     print("SHUFFLING as reached end of data")
                     self.genshuffle()
 
@@ -163,7 +135,6 @@ class BatchGenerator(object):
         self.wavpath, self.transcript, self.finish = shuffle(self.wavpath,
                                                              self.transcript,
                                                              self.finish)
-
 
     def export_test_mfcc(self):
         # this is used to export data e.g. into iOS
@@ -188,7 +159,6 @@ class BatchGenerator(object):
         return
 
 
-
 def get_normalise(self, k_samples=100):
     # todo use normalise from DS2 - https://github.com/baidu-research/ba-dls-deepspeech
     """ Estimate the mean and std of the features from the training set
@@ -203,10 +173,12 @@ def get_normalise(self, k_samples=100):
     # self.feats_std = np.std(feats, axis=0)
     pass
 
+
 def get_maxseq_len(trans):
     # PAD
     t = text_to_int_sequence(trans)
     return len(t)
+
 
 def get_intseq(trans, max_intseq_length=80):
     # PAD
@@ -216,11 +188,13 @@ def get_intseq(trans, max_intseq_length=80):
     # print(t)
     return t
 
+
 def get_max_time(filename):
     fs, audio = wav.read(filename)
     r = p.mfcc(audio, samplerate=fs, numcep=26)  # 2D array -> timesamples x mfcc_features
     # print(r.shape)
     return r.shape[0]  #
+
 
 def get_max_specto_time(filename):
     r = spectrogram_from_file(filename)
@@ -234,6 +208,7 @@ def get_max_aubio(filename):
 
     return r.shape[0]  #
 
+
 def make_specto_shape(filename, padlen=778):
     r = spectrogram_from_file(filename)
     t = np.transpose(r)  # 2D array ->  spec x timesamples
@@ -241,11 +216,13 @@ def make_specto_shape(filename, padlen=778):
 
     return X  # MAXtimesamples x specto {max x 161}
 
+
 def make_aubio_shape(filename, padlen=778):
     r = aubio(filename)
     t = np.transpose(r)  # 2D array ->  mfcc_features x timesamples
     X = pad_sequences(t, maxlen=padlen, dtype='float', padding='post', truncating='post').T
     return X  # 2D array -> MAXtimesamples x mfcc_features {778 x 26}
+
 
 def make_mfcc_shape(filename, padlen=778):
     fs, audio = wav.read(filename)
@@ -254,8 +231,10 @@ def make_mfcc_shape(filename, padlen=778):
     X = pad_sequences(t, maxlen=padlen, dtype='float', padding='post', truncating='post').T
     return X  # 2D array -> MAXtimesamples x mfcc_features {778 x 26}
 
+
 def get_xsize(val):
     return val.shape[0]
+
 
 def shuffle_data(self):
     self.wavpath, self.transcript, self.finish = shuffle(self.wavpath,
@@ -265,7 +244,6 @@ def shuffle_data(self):
 
 
 def aubio(source_filename):
-
     # print("Usage: %s <source_filename> [samplerate] [win_s] [hop_s] [mode]" % sys.argv[0])
     # print("  where [mode] can be 'delta' or 'ddelta' for first and second derivatives")7
 
@@ -292,6 +270,7 @@ def aubio(source_filename):
         if read < hop_s: break
 
     return mfccs
+
 
 ##Require for DS2 - source: https://github.com/baidu-research/ba-dls-deepspeech
 ##############################################################################
@@ -321,7 +300,7 @@ def spectrogram(samples, fft_length=256, sample_rate=2, hop_length=128):
     assert not np.iscomplexobj(samples), "Must not pass in complex numbers"
 
     window = np.hanning(fft_length)[:, None]
-    window_norm = np.sum(window**2)
+    window_norm = np.sum(window ** 2)
 
     # The scaling below follows the convention of
     # matplotlib.mlab.specgram which is the same as
@@ -341,7 +320,7 @@ def spectrogram(samples, fft_length=256, sample_rate=2, hop_length=128):
 
     # broadcast window, compute fft over columns and square mod
     x = np.fft.rfft(x * window, axis=0)
-    x = np.absolute(x)**2
+    x = np.absolute(x) ** 2
 
     # scale, 2.0 for everything except dc and fft_length/2
     x[1:-1, :] *= (2.0 / scale)
@@ -383,6 +362,7 @@ def spectrogram_from_file(filename, step=10, window=20, max_freq=None,
         ind = np.where(freqs <= max_freq)[0][-1] + 1
     return np.transpose(np.log(pxx[:ind, :] + eps))
 
+
 def featurise(audio_clip):
     """ For a given audio clip, calculate the log of its Fourier Transform
     Params:
@@ -396,4 +376,3 @@ def featurise(audio_clip):
     return spectrogram_from_file(
         audio_clip, step=step, window=window,
         max_freq=max_freq)
-
