@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-os.environ['CUDA_VISIBLE_DEVICES'] = "2"
 
 '''
 
@@ -34,6 +33,7 @@ from utils import load_model_checkpoint, save_model, MemoryCallback
 
 # Prevent pool_allocator message
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = "2"
 
 #######################################################
 
