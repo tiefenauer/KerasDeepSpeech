@@ -23,11 +23,11 @@ class BatchGenerator(object):
         self.wav_files = dataframe['wav_filename'].tolist()
         self.wav_sizes = dataframe['wav_filesize'].tolist()
         self.transcripts = dataframe['transcript'].tolist()
-        del dataframe
 
         self.shuffling = True
         self.cur_index = 0
         self.num_batches = steps or len(dataframe.index) // batch_size
+        del dataframe
 
     def get_batch(self, idx):
 

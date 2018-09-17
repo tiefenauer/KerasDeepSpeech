@@ -1,14 +1,14 @@
-from keras import callbacks
-from text import *
-
 import itertools
-import numpy as np
 import os
-import socket
 import sys
-import keras.backend as K
 
+import keras.backend as K
+import numpy as np
+from keras import callbacks
+
+from text import *
 from utils import save_model, int_to_text_sequence
+
 
 class ReportCallback(callbacks.Callback):
     def __init__(self, test_func, validdata, model, runtimestr, save):
@@ -21,7 +21,7 @@ class ReportCallback(callbacks.Callback):
 
         # useful if you want to decrease amount in validation
         self.valid_test_devide = 1  # 1=no reduce, 10 = 1/10th
-        #if socket.gethostname().lower() in 'rs-e5550'.lower(): self.valid_test_devide = 50
+        # if socket.gethostname().lower() in 'rs-e5550'.lower(): self.valid_test_devide = 50
 
         self.val_best_mean_ed = 0
         self.val_best_norm_mean_ed = 0
@@ -46,11 +46,10 @@ class ReportCallback(callbacks.Callback):
         count = 0
         self.validdata.cur_index = 0  # reset index
 
-        if self.valid_test_devide: #check not zero
-            allvalid = (len(self.validdata.wavpath) // self.validdata.batch_size) // self.valid_test_devide
+        if self.valid_test_devide:  # check not zero
+            allvalid = (len(self.validdata.wav_files) // self.validdata.batch_size) // self.valid_test_devide
 
-
-        #make a pass through all the validation data and assess score
+        # make a pass through all the validation data and assess score
         for c in range(0, allvalid):
 
             word_batch = next(self.validdata_next_val)[0]
@@ -64,16 +63,16 @@ class ReportCallback(callbacks.Callback):
                 decode_sent = decoded_res[j]
                 corrected = correction(decode_sent)
                 label = word_batch['source_str'][j]
-                #print(label)
+                # print(label)
 
                 if verbose:
                     cor_wer = wer(label, corrected)
                     dec_wer = wer(label, decode_sent)
 
-                    if(dec_wer < 0.4 or cor_wer < 0.4 or self.force_output):
+                    if (dec_wer < 0.4 or cor_wer < 0.4 or self.force_output):
                         print("\n{}.GroundTruth:{}\n{}.Transcribed:{}\n{}.LMCorrected:{}".format(str(j), label,
-                                                                                     str(j), decode_sent,
-                                                                                     str(j), corrected))
+                                                                                                 str(j), decode_sent,
+                                                                                                 str(j), corrected))
 
                     # print("Sample Decoded WER:{}, Corrected LM WER:{}".format(dec_wer, cor_wer))
 
@@ -98,31 +97,29 @@ class ReportCallback(callbacks.Callback):
         self.mean_ler_log.append(lmean)
         self.norm_mean_ler_log.append(norm_lmean)
 
-        #delete all values?
+        # delete all values?
         # del originals, results, count, allvalid
         # del word_batch, decoded_res
         # del decode_sent,
 
-
     def on_epoch_end(self, epoch, logs=None):
         K.set_learning_phase(0)
 
-        if(self.shuffle_epoch_end):
+        if (self.shuffle_epoch_end):
             print("shuffle_epoch_end")
             self.validdata.genshuffle()
-
 
         self.validate_epoch_end(verbose=1)
 
         if self.save:
-            #check to see lowest wer/ler on prev values
-            if(len(self.mean_wer_log)>2):
+            # check to see lowest wer/ler on prev values
+            if (len(self.mean_wer_log) > 2):
                 lastWER = self.mean_wer_log[-1]
                 allWER = np.min(self.mean_wer_log[:-1])
                 lastLER = self.mean_ler_log[-1]
                 allLER = np.min(self.mean_ler_log[:-1])
 
-                if(lastLER < allLER or lastWER < allWER):
+                if (lastLER < allLER or lastWER < allWER):
                     savedir = "./checkpoints/epoch/LER-WER-best-{}".format(self.runtimestr)
                     print("better ler/wer at:", savedir)
                     if not os.path.isdir(savedir):
@@ -132,9 +129,9 @@ class ReportCallback(callbacks.Callback):
                     except Exception as e:
                         print("couldn't save error:", e)
 
-                #early stopping if VAL WER worse 4 times in a row
-                if(len(self.mean_wer_log)>5 and self.earlystopping):
-                    if(earlyStopCheck(self.mean_wer_log[-5:])):
+                # early stopping if VAL WER worse 4 times in a row
+                if (len(self.mean_wer_log) > 5 and self.earlystopping):
+                    if (earlyStopCheck(self.mean_wer_log[-5:])):
                         print("EARLY STOPPING")
 
                         print("Mean WER   :", self.mean_wer_log)
@@ -143,14 +140,13 @@ class ReportCallback(callbacks.Callback):
 
                         sys.exit()
 
-
-        #activate learning phase - incase keras doesn't
+        # activate learning phase - incase keras doesn't
         K.set_learning_phase(1)
 
 
 def decode_batch(test_func, word_batch, batch_size):
     ret = []
-    output = test_func([word_batch])[0] #16xTIMEx29 = batch x time x classes
+    output = test_func([word_batch])[0]  # 16xTIMEx29 = batch x time x classes
     greedy = True
     merge_chars = True
 
@@ -161,33 +157,34 @@ def decode_batch(test_func, word_batch, batch_size):
             best = list(np.argmax(out, axis=1))
 
             if merge_chars:
-                merge = [k for k,g in itertools.groupby(best)]
+                merge = [k for k, g in itertools.groupby(best)]
 
             else:
                 raise ("not implemented no merge")
 
         else:
             pass
-            raise("not implemented beam")
+            raise ("not implemented beam")
 
         try:
             outStr = int_to_text_sequence(merge)
 
         except Exception as e:
             print("Unrecognised character on decode error:", e)
-            outStr = "DECODE ERROR:"+str(best)
-            raise("DECODE ERROR2")
+            outStr = "DECODE ERROR:" + str(best)
+            raise ("DECODE ERROR2")
 
         ret.append(''.join(outStr))
 
     return ret
+
 
 def earlyStopCheck(array):
     last = array[-1]
     rest = array[:-1]
     print(last, " vs ", rest)
 
-    #in other words- the last element is bigger than all 4 of the previous, therefore early stopping required
+    # in other words- the last element is bigger than all 4 of the previous, therefore early stopping required
     if all(i <= last for i in rest):
         return True
     else:
