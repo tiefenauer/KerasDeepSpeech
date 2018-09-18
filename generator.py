@@ -11,7 +11,6 @@ from python_speech_features import mfcc
 from sklearn.utils import shuffle
 
 from util.rnn_util import encode
-from utils import text_to_int_sequence
 
 
 class BatchGenerator(object):
@@ -34,14 +33,8 @@ class BatchGenerator(object):
         :return:
         """
         while True:
-
             if (self.cur_index + 1) * self.batch_size > self.n:
-
                 self.cur_index = 0
-
-                if self.shuffle:
-                    print("SHUFFLING as reached end of data")
-                    self.shuffle_entries()
 
             ret = self.get_batch(self.cur_index)
             self.cur_index += 1
