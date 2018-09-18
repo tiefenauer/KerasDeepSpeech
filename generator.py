@@ -10,6 +10,7 @@ from keras.preprocessing.sequence import pad_sequences
 from python_speech_features import mfcc
 from sklearn.utils import shuffle
 
+from util.rnn_util import encode
 from utils import text_to_int_sequence
 
 
@@ -51,7 +52,7 @@ class BatchGenerator(object):
         X_lengths = np.array([feature.shape[0] for feature in features])
 
         labels = self.extract_labels(index_array)
-        Y = pad_sequences([text_to_int_sequence(label) for label in labels], padding='post', value=27)
+        Y = pad_sequences([encode(label) for label in labels], padding='post', value=28)
         Y_lengths = np.array([len(label) for label in labels])
 
         inputs = {
@@ -108,14 +109,10 @@ class CSVBatchGenerator(BatchGenerator):
         self.wav_files, self.transcripts, self.wav_sizes = shuffle(self.wav_files, self.transcripts, self.wav_sizes)
 
     def extract_features(self, index_array):
-        return [self.extract_mfcc(wav_file) for wav_file in (self.wav_files[i] for i in index_array)]
+        return [extract_mfcc(wav_file) for wav_file in (self.wav_files[i] for i in index_array)]
 
     def extract_labels(self, index_array):
         return [self.transcripts[i] for i in index_array]
-
-    def extract_mfcc(self, wav_file_path):
-        fs, audio = wav.read(wav_file_path)
-        return mfcc(audio, samplerate=fs, numcep=26)  # (num_timesteps x num_features)
 
 
 def read_data_from_csv(csv_path, sort=True, create_word_list=False):
@@ -134,3 +131,8 @@ def read_data_from_csv(csv_path, sort=True, create_word_list=False):
         df = df.sort_values(by='wav_filesize', ascending=True)
 
     return df.reset_index(drop=True)
+
+
+def extract_mfcc(wav_file_path):
+    fs, audio = wav.read(wav_file_path)
+    return mfcc(audio, samplerate=fs, numcep=26)  # (num_timesteps x num_features)

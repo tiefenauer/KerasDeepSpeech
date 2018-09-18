@@ -72,7 +72,7 @@ def setup():
     if not isdir(output_dir):
         makedirs(output_dir)
 
-    log_file_path = join(output_dir, 'train.log')
+    # log_file_path = join(output_dir, 'train.log')
     # redirect_to_file(log_file_path)
 
     # detect user here too

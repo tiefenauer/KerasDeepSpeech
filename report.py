@@ -9,6 +9,7 @@ from keras import callbacks
 from tqdm import tqdm
 
 from text import *
+from util.rnn_util import decode
 from utils import save_model, int_to_text_sequence
 
 
@@ -63,15 +64,12 @@ class ReportCallback(callbacks.Callback):
             n_val_batches = n_val_batches // self.val_fraction
 
         # make a pass through all the validation data and assess score
-        for _ in tqdm(range(0, n_val_batches)):
+        for input_data, _ in tqdm(self.data_valid.next_batch()):
 
-            word_batch = next(self.data_valid)[0]
-            decoded_res = decode_batch(self.test_func,
-                                       word_batch['the_input'][0:self.data_valid.batch_size],
-                                       self.data_valid.batch_size)
+            decoded_res = decode_batch(self.test_func, input_data['the_input'])
 
             for j in range(0, self.data_valid.batch_size):
-                label_actual = word_batch['source_str'][j]
+                label_actual = input_data['source_str'][j]
                 label_decoded = decoded_res[j]
                 label_corrected = correction(label_decoded)
 
@@ -125,36 +123,15 @@ class ReportCallback(callbacks.Callback):
                 print("couldn't save error:", e)
 
 
-def decode_batch(test_func, word_batch, batch_size):
+def decode_batch(test_func, word_batch):
     ret = []
-    output = test_func([word_batch])[0]  # 16xTIMEx29 = batch x time x classes
-    greedy = True
-    merge_chars = True
+    y_pred = test_func([word_batch])[0]  # 16xTIMEx29 = batch x time x classes
 
-    for j in range(batch_size):  # 0:batch_size
-
-        if greedy:
-            out = output[j]
-            best = list(np.argmax(out, axis=1))
-
-            if merge_chars:
-                merge = [k for k, g in itertools.groupby(best)]
-
-            else:
-                raise NotImplementedError("not implemented no merge")
-
-        else:
-            pass
-            raise NotImplementedError("not implemented beam")
-
-        try:
-            outStr = int_to_text_sequence(merge)
-
-        except Exception as e:
-            print("Unrecognised character on decode error:", e)
-            raise ValueError("DECODE ERROR2")
-
-        ret.append(''.join(outStr))
+    for out in y_pred:
+        best = list(np.argmax(out, axis=1))
+        merge = [k for k, g in itertools.groupby(best)]
+        outStr = decode(merge)
+        ret.append(outStr)
 
     return ret
 

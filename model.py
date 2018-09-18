@@ -106,10 +106,7 @@ def ds1(input_dim=26, fc_size=1024, rnn_size=1024, output_dim=29):
 
     # Keras doesn't currently support loss funcs with extra parameters
     # so CTC loss is implemented in a lambda layer
-    loss_out = Lambda(ctc_lambda_func, output_shape=(1,), name='ctc')([y_pred,
-                                                                       labels,
-                                                                       input_length,
-                                                                       label_length])
+    loss_out = Lambda(ctc_lambda_func, output_shape=(1,), name='ctc')([y_pred, labels, input_length, label_length])
 
     model = Model(inputs=[input_data, labels, input_length, label_length], outputs=[loss_out])
 
