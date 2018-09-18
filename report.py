@@ -11,7 +11,8 @@ from utils import save_model, int_to_text_sequence
 
 
 class ReportCallback(callbacks.Callback):
-    def __init__(self, test_func, validdata, model, runtimestr, save):
+    def __init__(self, test_func, validdata, model, runtimestr, save, force_output=False):
+        super().__init__()
         self.test_func = test_func
 
         self.validdata = validdata
@@ -37,7 +38,7 @@ class ReportCallback(callbacks.Callback):
 
         self.earlystopping = True
         self.shuffle_epoch_end = True
-        self.force_output = False
+        self.force_output = force_output
 
     def validate_epoch_end(self, verbose=0):
 

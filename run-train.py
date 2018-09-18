@@ -120,7 +120,7 @@ def train_model(model):
     input_data = model.get_layer('the_input').input
 
     report = K.function([input_data, K.learning_phase()], [y_pred])
-    report_cb = ReportCallback(report, data_valid, model, args.name, save=True)
+    report_cb = ReportCallback(report, data_valid, model, args.name, save=True, force_output=True)
 
     cb_list.append(report_cb)
 
