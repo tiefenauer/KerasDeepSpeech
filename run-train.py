@@ -13,7 +13,7 @@ from os import makedirs
 from os.path import join, abspath, isdir
 
 from keras.callbacks import TensorBoard
-from keras.optimizers import Adam
+from keras.optimizers import Adam, SGD
 
 from generator import BatchGenerator, read_data_from_csv
 from model import *
@@ -55,7 +55,8 @@ def main():
     print(create_args_str(args))
 
     model = create_model(output_dir)
-    opt = Adam(lr=args.learning_rate, beta_1=0.9, beta_2=0.999, epsilon=1e-8, clipnorm=5)
+    # opt = Adam(lr=args.learning_rate, beta_1=0.9, beta_2=0.999, epsilon=1e-8, clipnorm=5)
+    opt = SGD(lr=args.learning_rate, decay=1e-6, momentum=0.9, nesterov=True, clipnorm=5)
     model.compile(optimizer=opt, loss=ctc)
 
     train_model(model)
