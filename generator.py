@@ -88,13 +88,13 @@ class OldBatchGenerator(BatchGenerator):
         batch_x = [wav_file for wav_file in (self.wav_files[i] for i in index_array)]
         batch_y_trans = [transcript for transcript in (self.transcripts[i] for i in index_array)]
 
-        try:
-            assert (len(batch_x) == self.batch_size)
-            assert (len(batch_y_trans) == self.batch_size)
-        except Exception as e:
-            print(e)
-            print(batch_x)
-            print(batch_y_trans)
+        # try:
+        #     assert (len(batch_x) == self.batch_size)
+        #     assert (len(batch_y_trans) == self.batch_size)
+        # except Exception as e:
+        #     print(e)
+        #     print(batch_x)
+        #     print(batch_y_trans)
 
         # 1. X_data (the MFCC's for the batch)
         x_val = [get_max_time(file_name) for file_name in batch_x]
@@ -102,23 +102,26 @@ class OldBatchGenerator(BatchGenerator):
         # print("Max batch time value is:", max_val)
 
         X_data = np.array([make_mfcc_shape(file_name, padlen=max_val) for file_name in batch_x])
-        print('should be:', (self.batch_size, max_val, 26))
-        print('is:', X_data.shape)
-        assert (X_data.shape == (self.batch_size, max_val, 26))
+        if X_data.shape != (self.batch_size, max_val, 26):
+            print('\n')
+            print('should be:', (self.batch_size, max_val, 26))
+            print('is:', X_data.shape)
+            print('\n')
+        # assert (X_data.shape == (self.batch_size, max_val, 26))
 
         # 2. labels (made numerical)
         y_val = [get_maxseq_len(l) for l in batch_y_trans]
         max_y = max(y_val)
         labels = np.array([get_intseq(l, max_intseq_length=max_y) for l in batch_y_trans])
-        assert (labels.shape == (self.batch_size, max_y))
+        # assert (labels.shape == (self.batch_size, max_y))
 
         # 3. input_length (required for CTC loss)
         input_length = np.array(x_val)
-        assert (input_length.shape == (self.batch_size,))
+        # assert (input_length.shape == (self.batch_size,))
 
         # 4. label_length (required for CTC loss)
         label_length = np.array(y_val)
-        assert (label_length.shape == (self.batch_size,))
+        # assert (label_length.shape == (self.batch_size,))
 
         # 5. source_str (used for human readable output on callback)
         source_str = np.array([l for l in batch_y_trans])
@@ -159,7 +162,7 @@ class OldBatchGenerator(BatchGenerator):
         max_val = max(x_val)
         # print("Max batch time value is:", max_val)
 
-        X_data = np.array([calc_mfcc(file_name, padlen=max_val) for file_name in batch_x])
+        X_data = np.array([make_mfcc_shape(file_name, padlen=max_val) for file_name in batch_x])
         assert (X_data.shape == (self.batch_size, max_val, 26))
 
         # 2. labels (made numerical)
