@@ -10,20 +10,19 @@ from tqdm import tqdm
 
 from text import *
 from util.rnn_util import decode
-from utils import save_model, int_to_text_sequence
+from utils import save_model
 
 
 class ReportCallback(callbacks.Callback):
-    def __init__(self, data_valid, model, run_id, val_fraction=1, save_progress=True, early_stopping=True,
-                 shuffle_data=True, force_output=False):
+    def __init__(self, data_valid, model, run_id, save_progress=True, early_stopping=True, shuffle_data=True,
+                 force_output=False):
         """
         Will calculate WER and LER at epoch end and print out infered transcriptions from validation set using the 
         current model and weights
         :param data_valid: validation data
         :param model: compiled model
         :param run_id: string that identifies the current run
-        :param val_fraction: fraction of the validation data to use for validation (10 = one tenth)
-        :param save_progress: 
+        :param save_progress:
         :param early_stopping: 
         :param shuffle_data: 
         :param force_output: 
@@ -32,7 +31,6 @@ class ReportCallback(callbacks.Callback):
         self.data_valid = data_valid
         self.model = model
         self.run_id = run_id
-        self.val_fraction = val_fraction
         self.save_progress = save_progress
         self.early_stopping = early_stopping
         self.shuffle_data = shuffle_data
@@ -59,17 +57,12 @@ class ReportCallback(callbacks.Callback):
         originals, results = [], []
         self.data_valid.cur_index = 0  # reset index
 
-        n_val_batches = len(self.data_valid.wav_files) // self.data_valid.batch_size
-        if self.val_fraction:
-            n_val_batches = n_val_batches // self.val_fraction
-
-        # make a pass through all the validation data and assess score
-        for input_data, _ in tqdm(self.data_valid.next_batch()):
-
-            decoded_res = decode_batch(self.test_func, input_data['the_input'])
+        for _ in tqdm(range(len(self.data_valid))):
+            batch_inputs, _ = next(self.data_valid.next_batch())
+            decoded_res = decode_batch(self.test_func, batch_inputs['the_input'])
 
             for j in range(0, self.data_valid.batch_size):
-                label_actual = input_data['source_str'][j]
+                label_actual = batch_inputs['source_str'][j]
                 label_decoded = decoded_res[j]
                 label_corrected = correction(label_decoded)
 

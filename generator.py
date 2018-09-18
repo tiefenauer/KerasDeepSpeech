@@ -22,7 +22,7 @@ class BatchGenerator(object):
         self.cur_index = 0
 
     def __len__(self):
-        return self.n // self.batch_size
+        return self.n // self.batch_size # number of batches
 
     def __iter__(self):
         return self
@@ -31,6 +31,11 @@ class BatchGenerator(object):
         return self.next_batch()
 
     def next_batch(self):
+        """
+        Returns a generator for the dataset. Because for training the dataset is iterated over once per epoch, this
+        function is an endless loop over set.
+        :return:
+        """
         while True:
 
             if (self.cur_index + 1) * self.batch_size > self.n:
