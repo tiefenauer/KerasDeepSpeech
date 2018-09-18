@@ -181,4 +181,4 @@ def new_benchmark(values):
     :param values: sequence of values
     :return:
     """
-    return values[-1] < np.min(values[:-1])
+    return len(values) > 2 and values[-1] < np.min(values[:-1])
