@@ -85,7 +85,7 @@ class OldBatchGenerator(BatchGenerator):
         del df
 
     def _get_batches_of_transformed_samples(self, index_array):
-        batch_x = [wav_file for wav_file in (self.wav_files[i] for i in index_array)]
+        batch_x = [wav_file for wav_file in [self.wav_files[i] for i in index_array]]
         batch_y_trans = [transcript for transcript in (self.transcripts[i] for i in index_array)]
 
         # try:
