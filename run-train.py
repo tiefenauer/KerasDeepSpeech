@@ -116,11 +116,7 @@ def train_model(model):
         tb_cb = TensorBoard(log_dir=join('tensorboard', args.name), write_graph=False, write_images=True)
         cb_list.append(tb_cb)
 
-    y_pred = model.get_layer('ctc').input[0]
-    input_data = model.get_layer('the_input').input
-
-    report = K.function([input_data, K.learning_phase()], [y_pred])
-    report_cb = ReportCallback(report, data_valid, model, args.name, save=True, force_output=True)
+    report_cb = ReportCallback(data_valid, model, args.name, save=True)
 
     cb_list.append(report_cb)
 

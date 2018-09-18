@@ -1,23 +1,30 @@
 import itertools
 import os
 import sys
+from os import makedirs
+from os.path import join, isdir
 
 import keras.backend as K
 import numpy as np
 from keras import callbacks
+from tqdm import tqdm
 
 from text import *
 from utils import save_model, int_to_text_sequence
 
 
 class ReportCallback(callbacks.Callback):
-    def __init__(self, test_func, validdata, model, runtimestr, save, force_output=False):
+    def __init__(self, data_valid, model, runtimestr, save, force_output=False):
         super().__init__()
+        self.data_valid = data_valid
+
+        y_pred = model.get_layer('ctc').input[0]
+        input_data = model.get_layer('the_input').input
+        test_func = K.function([input_data, K.learning_phase()], [y_pred])
         self.test_func = test_func
 
-        self.validdata = validdata
-        self.validdata_next_val = self.validdata.next_batch()
-        self.batch_size = validdata.batch_size
+        self.validdata_next_val = self.data_valid.next_batch()
+        self.batch_size = data_valid.batch_size
         self.save = save
 
         # useful if you want to decrease amount in validation
@@ -40,18 +47,23 @@ class ReportCallback(callbacks.Callback):
         self.shuffle_epoch_end = True
         self.force_output = force_output
 
-    def validate_epoch_end(self, verbose=0):
+    def validate_epoch(self, epoch):
+        print(f'validating epoch {epoch}')
+        K.set_learning_phase(0)
 
-        originals = []
-        results = []
-        count = 0
-        self.validdata.cur_index = 0  # reset index
+        if self.shuffle_epoch_end:
+            print("shuffling validation data")
+            self.data_valid.genshuffle()
 
-        if self.valid_test_devide:  # check not zero
-            allvalid = (len(self.validdata.wav_files) // self.validdata.batch_size) // self.valid_test_devide
+        originals, results = [], []
+        self.data_valid.cur_index = 0  # reset index
+
+        n_val_batches = len(self.data_valid.wav_files) // self.data_valid.batch_size
+        if self.valid_test_devide:
+            n_val_batches = n_val_batches // self.valid_test_devide
 
         # make a pass through all the validation data and assess score
-        for c in range(0, allvalid):
+        for _ in tqdm(range(0, n_val_batches)):
 
             word_batch = next(self.validdata_next_val)[0]
             decoded_res = decode_batch(self.test_func,
@@ -59,90 +71,58 @@ class ReportCallback(callbacks.Callback):
                                        self.batch_size)
 
             for j in range(0, self.batch_size):
-                # print(c,j)
-                count += 1
-                decode_sent = decoded_res[j]
-                corrected = correction(decode_sent)
-                label = word_batch['source_str'][j]
-                # print(label)
+                label_actual = word_batch['source_str'][j]
+                label_decoded = decoded_res[j]
+                label_corrected = correction(label_decoded)
 
-                if verbose:
-                    cor_wer = wer(label, corrected)
-                    dec_wer = wer(label, decode_sent)
+                wer_decoded = wer(label_actual, label_decoded)
+                wer_corrected = wer(label_actual, label_corrected)
 
-                    if (dec_wer < 0.4 or cor_wer < 0.4 or self.force_output):
-                        print("\n{}.GroundTruth:{}\n{}.Transcribed:{}\n{}.LMCorrected:{}".format(str(j), label,
-                                                                                                 str(j), decode_sent,
-                                                                                                 str(j), corrected))
+                if self.force_output or wer_decoded < 0.4 or wer_corrected < 0.4:
+                    print(f'{j} GroundTruth:{label_actual}')
+                    print(f'{j} Transcribed:{label_decoded}')
+                    print(f'{j} LMCorrected:{label_corrected}')
 
-                    # print("Sample Decoded WER:{}, Corrected LM WER:{}".format(dec_wer, cor_wer))
+                originals.append(label_actual)
+                results.append(label_corrected)
 
-                originals.append(label)
-                results.append(corrected)
-
-        print("########################################################")
-        print("Completed Validation Test: WER & LER results")
         rates, mean = wers(originals, results)
-        # print("WER rates     :", rates)
         lrates, lmean, norm_lrates, norm_lmean = lers(originals, results)
-        # print("LER rates     :", lrates)
-        # print("LER norm rates:", norm_lrates)
-        # print("########################################################")
-        print("Test WER average is   :", mean)
-        print("Test LER average is   :", lmean)
-        print("Test normalised LER is:", norm_lmean)
         print("########################################################")
-        # print("(note both WER and LER use LanguageModel not raw output)")
+        print("Validation results: WER & LER (using LM)")
+        print("WER average is   :", mean)
+        print("LER average is   :", lmean)
+        print("normalised LER is:", norm_lmean)
+        print("########################################################")
 
         self.mean_wer_log.append(mean)
         self.mean_ler_log.append(lmean)
         self.norm_mean_ler_log.append(norm_lmean)
 
-        # delete all values?
-        # del originals, results, count, allvalid
-        # del word_batch, decoded_res
-        # del decode_sent,
+        K.set_learning_phase(1)
 
     def on_epoch_end(self, epoch, logs=None):
-        K.set_learning_phase(0)
+        self.validate_epoch(epoch)
 
-        if (self.shuffle_epoch_end):
-            print("shuffle_epoch_end")
-            self.validdata.genshuffle()
+        # early stopping if VAL WER worse 4 times in a row
+        if self.earlystopping and is_early_stopping(self.mean_wer_log):
+            print("EARLY STOPPING")
+            print("Mean WER   :", self.mean_wer_log)
+            print("Mean LER   :", self.mean_ler_log)
+            print("NormMeanLER:", self.norm_mean_ler_log)
 
-        self.validate_epoch_end(verbose=1)
+            sys.exit()
 
-        if self.save:
-            # check to see lowest wer/ler on prev values
-            if (len(self.mean_wer_log) > 2):
-                lastWER = self.mean_wer_log[-1]
-                allWER = np.min(self.mean_wer_log[:-1])
-                lastLER = self.mean_ler_log[-1]
-                allLER = np.min(self.mean_ler_log[:-1])
-
-                if (lastLER < allLER or lastWER < allWER):
-                    savedir = "./checkpoints/epoch/LER-WER-best-{}".format(self.runtimestr)
-                    print("better ler/wer at:", savedir)
-                    if not os.path.isdir(savedir):
-                        os.makedirs(savedir)
-                    try:
-                        save_model(self.model, name=savedir)
-                    except Exception as e:
-                        print("couldn't save error:", e)
-
-                # early stopping if VAL WER worse 4 times in a row
-                if (len(self.mean_wer_log) > 5 and self.earlystopping):
-                    if (earlyStopCheck(self.mean_wer_log[-5:])):
-                        print("EARLY STOPPING")
-
-                        print("Mean WER   :", self.mean_wer_log)
-                        print("Mean LER   :", self.mean_ler_log)
-                        print("NormMeanLER:", self.norm_mean_ler_log)
-
-                        sys.exit()
-
-        # activate learning phase - incase keras doesn't
-        K.set_learning_phase(1)
+        # save checkpoint if last LER or last WER was better than all previous values
+        if self.save and (new_benchmark(self.mean_ler_log) or new_benchmark(self.mean_wer_log)):
+            save_dir = join('checkpoints', 'epoch', f'LER-WER-best-{self.runtimestr}')
+            print(f'New WER or LER benchmark! Saving model and weights at {save_dir}')
+            if not isdir(save_dir):
+                makedirs(save_dir)
+            try:
+                save_model(self.model, name=save_dir)
+            except Exception as e:
+                print("couldn't save error:", e)
 
 
 def decode_batch(test_func, word_batch, batch_size):
@@ -161,32 +141,44 @@ def decode_batch(test_func, word_batch, batch_size):
                 merge = [k for k, g in itertools.groupby(best)]
 
             else:
-                raise ("not implemented no merge")
+                raise NotImplementedError("not implemented no merge")
 
         else:
             pass
-            raise ("not implemented beam")
+            raise NotImplementedError("not implemented beam")
 
         try:
             outStr = int_to_text_sequence(merge)
 
         except Exception as e:
             print("Unrecognised character on decode error:", e)
-            outStr = "DECODE ERROR:" + str(best)
-            raise ("DECODE ERROR2")
+            raise ValueError("DECODE ERROR2")
 
         ret.append(''.join(outStr))
 
     return ret
 
 
-def earlyStopCheck(array):
-    last = array[-1]
-    rest = array[:-1]
+def is_early_stopping(wer_logs):
+    """
+    stop early if last WER is bigger than all 4 previous WERs
+    :param wer_logs: log-scaled WER values
+    :return:
+    """
+    if len(wer_logs) <= 4:
+        return False
+
+    last = wer_logs[-1]
+    rest = wer_logs[-5:-1]
     print(last, " vs ", rest)
 
-    # in other words- the last element is bigger than all 4 of the previous, therefore early stopping required
-    if all(i <= last for i in rest):
-        return True
-    else:
-        return False
+    return all(i <= last for i in rest)
+
+
+def new_benchmark(values):
+    """
+    We have a new benchmark if the last value in a sequence of values is the smallest
+    :param values: sequence of values
+    :return:
+    """
+    return values[-1] < np.min(values[:-1])
