@@ -107,9 +107,9 @@ def create_model(output_dir):
 
 def train_model(model):
     print("Creating data batch generators")
-    data_train = OldBatchGenerator(args.train_files, shuffle=False, n_batches=args.train_batches,
+    data_train = CSVBatchGenerator(args.train_files, shuffle=False, n_batches=args.train_batches,
                                    batch_size=args.batch_size)
-    data_valid = OldBatchGenerator(args.valid_files, shuffle=True, n_batches=args.valid_batches,
+    data_valid = CSVBatchGenerator(args.valid_files, shuffle=True, n_batches=args.valid_batches,
                                    batch_size=args.batch_size)
 
     cb_list = []
@@ -123,7 +123,11 @@ def train_model(model):
     report_cb = ReportCallback(data_valid, model, args.name)
     cb_list.append(report_cb)
 
-    model.fit_generator(generator=data_train, validation_data=data_valid, epochs=args.epochs, callbacks=cb_list)
+    model.fit_generator(generator=data_train.next_batch(),
+                        validation_data=data_valid.next_batch(),
+                        steps_per_epoch=len(data_train),
+                        validation_steps=len(data_valid),
+                        epochs=args.epochs, callbacks=cb_list)
 
     print("Mean WER   :", report_cb.mean_wer_log)
     print("Mean LER   :", report_cb.mean_ler_log)

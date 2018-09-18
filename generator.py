@@ -1,5 +1,5 @@
 import sys
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from genericpath import isfile
 from os.path import join
 
@@ -8,7 +8,6 @@ import pandas as pd
 import scipy.io.wavfile as wav
 import soundfile
 from keras.preprocessing.sequence import pad_sequences
-from keras_preprocessing.image import Iterator
 from numpy.lib.stride_tricks import as_strided
 from python_speech_features import mfcc
 from sklearn.utils import shuffle
@@ -16,11 +15,33 @@ from sklearn.utils import shuffle
 from utils import text_to_int_sequence
 
 
-class BatchGenerator(Iterator, ABC):
+class BatchGenerator(object):
     def __init__(self, n, shuffle, batch_size):
-        super().__init__(n, batch_size=batch_size, shuffle=shuffle, seed=None)
+        self.n = n
+        self.shuffle = shuffle
+        self.batch_size = batch_size
+        self.cur_index = 0
 
-    def _get_batches_of_transformed_samples(self, index_array):
+    def __len__(self):
+        return self.n // self.batch_size
+
+    def next_batch(self):
+        while True:
+
+            if (self.cur_index + 1) * self.batch_size >= self.n - self.batch_size:
+
+                self.cur_index = 0
+
+                if self.shuffle:
+                    print("SHUFFLING as reached end of data")
+                    self.shuffle_entries()
+
+            ret = self.get_batch(self.cur_index)
+            self.cur_index += 1
+            yield ret
+
+    def get_batch(self, idx):
+        index_array = range(idx * self.batch_size, (idx + 1) * self.batch_size)
         features = self.extract_features(index_array)
         X = pad_sequences(features, dtype='float32', padding='post')
         X_lengths = np.array([feature.shape[0] for feature in features])
@@ -41,14 +62,18 @@ class BatchGenerator(Iterator, ABC):
 
         return inputs, outputs
 
-    def __iter__(self):
-        return self
+    # def __iter__(self):
+    #     return self
+    #
+    # def next(self):
+    #     with self.lock:
+    #         index_array = next(self.index_generator)
+    #     index_array.sort()
+    #     return self._get_batches_of_transformed_samples(index_array.tolist())
 
-    def next(self):
-        with self.lock:
-            index_array = next(self.index_generator)
-        index_array.sort()
-        return self._get_batches_of_transformed_samples(index_array.tolist())
+    @abstractmethod
+    def shuffle_entries(self):
+        raise NotImplementedError
 
     @abstractmethod
     def extract_features(self, index_array):
@@ -83,18 +108,19 @@ class OldBatchGenerator(BatchGenerator):
 
         super().__init__(n=len(df.index), batch_size=batch_size, shuffle=shuffle)
         del df
+        self.cur_index = 0
 
     def _get_batches_of_transformed_samples(self, index_array):
         batch_x = [wav_file for wav_file in [self.wav_files[i] for i in index_array]]
-        batch_y_trans = [transcript for transcript in (self.transcripts[i] for i in index_array)]
+        batch_y_trans = [transcript for transcript in [self.transcripts[i] for i in index_array]]
 
-        # try:
-        #     assert (len(batch_x) == self.batch_size)
-        #     assert (len(batch_y_trans) == self.batch_size)
-        # except Exception as e:
-        #     print(e)
-        #     print(batch_x)
-        #     print(batch_y_trans)
+        try:
+            assert (len(batch_x) == self.batch_size)
+            assert (len(batch_y_trans) == self.batch_size)
+        except Exception as e:
+            print(e)
+            print(batch_x)
+            print(batch_y_trans)
 
         # 1. X_data (the MFCC's for the batch)
         x_val = [get_max_time(file_name) for file_name in batch_x]
@@ -107,21 +133,21 @@ class OldBatchGenerator(BatchGenerator):
             print('should be:', (self.batch_size, max_val, 26))
             print('is:', X_data.shape)
             print('\n')
-        # assert (X_data.shape == (self.batch_size, max_val, 26))
+        assert (X_data.shape == (self.batch_size, max_val, 26))
 
         # 2. labels (made numerical)
         y_val = [get_maxseq_len(l) for l in batch_y_trans]
         max_y = max(y_val)
         labels = np.array([get_intseq(l, max_intseq_length=max_y) for l in batch_y_trans])
-        # assert (labels.shape == (self.batch_size, max_y))
+        assert (labels.shape == (self.batch_size, max_y))
 
         # 3. input_length (required for CTC loss)
         input_length = np.array(x_val)
-        # assert (input_length.shape == (self.batch_size,))
+        assert (input_length.shape == (self.batch_size,))
 
         # 4. label_length (required for CTC loss)
         label_length = np.array(y_val)
-        # assert (label_length.shape == (self.batch_size,))
+        assert (label_length.shape == (self.batch_size,))
 
         # 5. source_str (used for human readable output on callback)
         source_str = np.array([l for l in batch_y_trans])
@@ -245,8 +271,8 @@ class OldBatchGenerator(BatchGenerator):
 
 class CSVBatchGenerator(BatchGenerator):
 
-    def __init__(self, csv_path, sort_entries=True, shuffle=False, n_batches=None, batch_size=16):
-        df = read_data_from_csv(csv_path=csv_path, sort=sort_entries)
+    def __init__(self, csv_path, shuffle=False, n_batches=None, batch_size=16):
+        df = read_data_from_csv(csv_path=csv_path, sort=True)
         if n_batches:
             df = df.head(n_batches * batch_size)
 
@@ -256,6 +282,9 @@ class CSVBatchGenerator(BatchGenerator):
 
         super().__init__(n=len(df.index), batch_size=batch_size, shuffle=shuffle)
         del df
+
+    def shuffle_entries(self):
+        self.wav_files, self.transcripts, self.wav_sizes = shuffle(self.wav_files, self.transcripts, self.wav_sizes)
 
     def extract_features(self, index_array):
         return [self.extract_mfcc(wav_file) for wav_file in (self.wav_files[i] for i in index_array)]
