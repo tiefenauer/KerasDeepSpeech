@@ -183,14 +183,16 @@ class OldBatchGenerator(object):
 class CSVBatchGenerator(BatchGenerator):
 
     def __init__(self, csv_path, sort_entries=True, shuffle=False, n_batches=None, batch_size=16):
-        dataframe = read_data_from_csv(csv_path=csv_path, sort=sort_entries).head(n_batches * batch_size)
+        df = read_data_from_csv(csv_path=csv_path, sort=sort_entries)
+        if n_batches:
+            df = df.head(n_batches * batch_size)
 
-        self.wav_files = dataframe['wav_filename'].tolist()
-        self.wav_sizes = dataframe['wav_filesize'].tolist()
-        self.transcripts = dataframe['transcript'].tolist()
+        self.wav_files = df['wav_filename'].tolist()
+        self.wav_sizes = df['wav_filesize'].tolist()
+        self.transcripts = df['transcript'].tolist()
 
-        super().__init__(n=len(dataframe.index), batch_size=batch_size, shuffle=shuffle)
-        del dataframe
+        super().__init__(n=len(df.index), batch_size=batch_size, shuffle=shuffle)
+        del df
 
     def extract_features(self, index_array):
         return [calc_mfcc(wav_file) for wav_file in (self.wav_files[i] for i in index_array)]
