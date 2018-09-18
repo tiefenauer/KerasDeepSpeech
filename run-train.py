@@ -15,7 +15,7 @@ from os.path import join, abspath, isdir
 from keras.callbacks import TensorBoard
 from keras.optimizers import SGD
 
-from generator import CSVBatchGenerator
+from generator import CSVBatchGenerator, OldBatchGenerator
 from model import *
 from report import ReportCallback
 from util.log_util import create_args_str
@@ -107,9 +107,9 @@ def create_model(output_dir):
 
 def train_model(model):
     print("Creating data batch generators")
-    data_train = CSVBatchGenerator(args.train_files, shuffle=False, n_batches=args.train_batches,
+    data_train = OldBatchGenerator(args.train_files, shuffle=False, n_batches=args.train_batches,
                                    batch_size=args.batch_size)
-    data_valid = CSVBatchGenerator(args.valid_files, shuffle=True, n_batches=args.valid_batches,
+    data_valid = OldBatchGenerator(args.valid_files, shuffle=True, n_batches=args.valid_batches,
                                    batch_size=args.batch_size)
 
     cb_list = []

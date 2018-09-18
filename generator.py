@@ -70,7 +70,75 @@ class BatchGenerator(Iterator, ABC):
         raise NotImplementedError
 
 
-class OldBatchGenerator(object):
+class OldBatchGenerator(BatchGenerator):
+
+    def __init__(self, csv_path, sort_entries=True, shuffle=False, n_batches=None, batch_size=16):
+        df = read_data_from_csv(csv_path=csv_path, sort=sort_entries)
+        if n_batches:
+            df = df.head(n_batches * batch_size)
+
+        self.wav_files = df['wav_filename'].tolist()
+        self.wav_sizes = df['wav_filesize'].tolist()
+        self.transcripts = df['transcript'].tolist()
+
+        super().__init__(n=len(df.index), batch_size=batch_size, shuffle=shuffle)
+        del df
+
+    def _get_batches_of_transformed_samples(self, index_array):
+        batch_x = [wav_file for wav_file in (self.wav_files[i] for i in index_array)]
+        batch_y_trans = [transcript for transcript in (self.transcripts[i] for i in index_array)]
+
+        try:
+            assert (len(batch_x) == self.batch_size)
+            assert (len(batch_y_trans) == self.batch_size)
+        except Exception as e:
+            print(e)
+            print(batch_x)
+            print(batch_y_trans)
+
+        # 1. X_data (the MFCC's for the batch)
+        x_val = [get_max_time(file_name) for file_name in batch_x]
+        max_val = max(x_val)
+        # print("Max batch time value is:", max_val)
+
+        X_data = np.array([make_mfcc_shape(file_name, padlen=max_val) for file_name in batch_x])
+        assert (X_data.shape == (self.batch_size, max_val, 26))
+
+        # 2. labels (made numerical)
+        y_val = [get_maxseq_len(l) for l in batch_y_trans]
+        max_y = max(y_val)
+        labels = np.array([get_intseq(l, max_intseq_length=max_y) for l in batch_y_trans])
+        assert (labels.shape == (self.batch_size, max_y))
+
+        # 3. input_length (required for CTC loss)
+        input_length = np.array(x_val)
+        assert (input_length.shape == (self.batch_size,))
+
+        # 4. label_length (required for CTC loss)
+        label_length = np.array(y_val)
+        assert (label_length.shape == (self.batch_size,))
+
+        # 5. source_str (used for human readable output on callback)
+        source_str = np.array([l for l in batch_y_trans])
+
+        inputs = {
+            'the_input': X_data,
+            'the_labels': labels,
+            'input_length': input_length,
+            'label_length': label_length,
+            'source_str': source_str
+        }
+
+        outputs = {'ctc': np.zeros([self.batch_size])}
+
+        return inputs, outputs
+
+    def extract_features(self, index_array):
+        pass
+
+    def extract_labels(self, index_array):
+        pass
+
     def get_batch(self, idx):
 
         batch_x = self.wav_files[idx * self.batch_size:(idx + 1) * self.batch_size]
@@ -245,13 +313,12 @@ def make_specto_shape(filename, padlen=778):
     return X  # MAXtimesamples x specto {max x 161}
 
 
-def calc_mfcc(wav_file_path):
-    fs, audio = wav.read(wav_file_path)
-    features = mfcc(audio, samplerate=fs, numcep=26)
-    return features
+def make_mfcc_shape(filename, padlen=778):
+    fs, audio = wav.read(filename)
     r = mfcc(audio, samplerate=fs, numcep=26)  # 2D array -> timesamples x mfcc_features
     t = np.transpose(r)  # 2D array ->  mfcc_features x timesamples
-    return pad_sequences(t, dtype='float', padding='post', truncating='post').T
+    X = pad_sequences(t, maxlen=padlen, dtype='float', padding='post', truncating='post').T
+    return X  # 2D array -> MAXtimesamples x mfcc_features {778 x 26}
 
 
 def get_xsize(val):
