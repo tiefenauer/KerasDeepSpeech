@@ -48,7 +48,7 @@ def ctc(y_true, y_pred):
     return y_pred
 
 
-def deep_speech_dropout(input_dim=26, fc_size=2048, rnn_size=512, output_dim=29):
+def deep_speech_dropout(input_dim=26, fc_size=1024, rnn_size=1024, output_dim=29):
     """ DeepSpeech 1 Implementation without dropout
 
     Architecture:
