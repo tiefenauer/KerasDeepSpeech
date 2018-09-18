@@ -1,34 +1,86 @@
 import sys
+from abc import ABC, abstractmethod
 from genericpath import isfile
+from os.path import join
 
 import numpy as np
 import pandas as pd
-import python_speech_features as p
 import scipy.io.wavfile as wav
 import soundfile
-from aubio import source, pvoc, mfcc
 from keras.preprocessing.sequence import pad_sequences
-from numpy import vstack, zeros
+from keras_preprocessing.image import Iterator
 from numpy.lib.stride_tricks import as_strided
+from python_speech_features import mfcc
 from sklearn.utils import shuffle
 
 from utils import text_to_int_sequence
 
 
-class BatchGenerator(object):
-    def __init__(self, csv_path, sort, steps=0, batch_size=16):
-        self.batch_size = batch_size
+class BatchGenerator(Iterator, ABC):
+    def __init__(self, n, shuffle, batch_size):
+        super().__init__(n, batch_size=batch_size, shuffle=shuffle, seed=None)
 
-        dataframe = read_data_from_csv(csv_path=csv_path, sort=sort)
-        self.wav_files = dataframe['wav_filename'].tolist()
-        self.wav_sizes = dataframe['wav_filesize'].tolist()
-        self.transcripts = dataframe['transcript'].tolist()
+    def _get_batches_of_transformed_samples(self, index_array):
+        features = self.extract_features(index_array)
+        labels = self.extract_labels(index_array)
 
-        self.shuffling = True
-        self.cur_index = 0
-        self.num_batches = steps or len(dataframe.index) // batch_size
-        del dataframe
+        X, X_lengths = self.make_batch_inputs(features)
+        Y, Y_lengths = self.make_batch_outputs(labels)
 
+        inputs = {
+            'the_input': X,
+            'the_labels': Y,
+            'input_length': X_lengths,
+            'label_length': Y_lengths,
+            'source_str': labels
+        }
+
+        outputs = {'ctc': np.zeros([self.batch_size])}
+
+        return inputs, outputs
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        with self.lock:
+            index_array = next(self.index_generator)
+        index_array.sort()
+        return self._get_batches_of_transformed_samples(index_array.tolist())
+
+    @staticmethod
+    def make_batch_inputs(features):
+        batch_inputs = pad_sequences(features, dtype='float32', padding='post')
+        batch_inputs_len = np.array([feature.shape[0] for feature in features])
+        return batch_inputs, batch_inputs_len
+
+    @staticmethod
+    def make_batch_outputs(labels):
+        batch_outputs = pad_sequences([text_to_int_sequence(label) for label in labels], padding='post', value=27)
+        batch_outputs_len = np.array([len(label) for label in labels])
+        return batch_outputs, batch_outputs_len
+
+    @abstractmethod
+    def extract_features(self, index_array):
+        """
+        Extract unpadded features for a batch of elements with specified indices
+        :param index_array: array with indices of elements in current batch
+        :return: list of unpadded features
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def extract_labels(self, index_array):
+        """
+        Extract unpadded, unencoded labels for a batch of elements with specified indices
+        :param index_array: array with indices of elements in current batch
+        :return: list of textual labels
+        """
+        """"""
+        raise NotImplementedError
+
+
+class OldBatchGenerator(object):
     def get_batch(self, idx):
 
         batch_x = self.wav_files[idx * self.batch_size:(idx + 1) * self.batch_size]
@@ -47,7 +99,7 @@ class BatchGenerator(object):
         max_val = max(x_val)
         # print("Max batch time value is:", max_val)
 
-        X_data = np.array([make_mfcc_shape(file_name, padlen=max_val) for file_name in batch_x])
+        X_data = np.array([calc_mfcc(file_name, padlen=max_val) for file_name in batch_x])
         assert (X_data.shape == (self.batch_size, max_val, 26))
 
         # 2. labels (made numerical)
@@ -87,7 +139,7 @@ class BatchGenerator(object):
 
                 self.cur_index = 0
 
-                if self.shuffling == True:
+                if self.shuffle:
                     print("SHUFFLING as reached end of data")
                     self.genshuffle()
 
@@ -130,6 +182,25 @@ class BatchGenerator(object):
         return
 
 
+class CSVBatchGenerator(BatchGenerator):
+
+    def __init__(self, csv_path, sort_entries=True, shuffle=False, n_batches=None, batch_size=16):
+        dataframe = read_data_from_csv(csv_path=csv_path, sort=sort_entries).head(n_batches * batch_size)
+
+        self.wav_files = dataframe['wav_filename'].tolist()
+        self.wav_sizes = dataframe['wav_filesize'].tolist()
+        self.transcripts = dataframe['transcript'].tolist()
+
+        super().__init__(n=len(dataframe.index), batch_size=batch_size, shuffle=shuffle)
+        del dataframe
+
+    def extract_features(self, index_array):
+        return [calc_mfcc(wav_file) for wav_file in (self.wav_files[i] for i in index_array)]
+
+    def extract_labels(self, index_array):
+        return [self.transcripts[i] for i in index_array]
+
+
 def get_normalise(self, k_samples=100):
     # todo use normalise from DS2 - https://github.com/baidu-research/ba-dls-deepspeech
     """ Estimate the mean and std of the features from the training set
@@ -152,7 +223,6 @@ def get_maxseq_len(trans):
 
 
 def get_intseq(trans, max_intseq_length=80):
-    # PAD
     t = text_to_int_sequence(trans)
     while (len(t) < max_intseq_length):
         t.append(27)  # replace with a space char to pad
@@ -162,7 +232,7 @@ def get_intseq(trans, max_intseq_length=80):
 
 def get_max_time(filename):
     fs, audio = wav.read(filename)
-    r = p.mfcc(audio, samplerate=fs, numcep=26)  # 2D array -> timesamples x mfcc_features
+    r = mfcc(audio, samplerate=fs, numcep=26)  # 2D array -> timesamples x mfcc_features
     # print(r.shape)
     return r.shape[0]  #
 
@@ -170,13 +240,6 @@ def get_max_time(filename):
 def get_max_specto_time(filename):
     r = spectrogram_from_file(filename)
     # print(r.shape)
-    return r.shape[0]  #
-
-
-def get_max_aubio(filename):
-    r = aubio(filename)  # 2D array -> timesamples x mfcc_features
-    # print(r.shape)
-
     return r.shape[0]  #
 
 
@@ -188,19 +251,13 @@ def make_specto_shape(filename, padlen=778):
     return X  # MAXtimesamples x specto {max x 161}
 
 
-def make_aubio_shape(filename, padlen=778):
-    r = aubio(filename)
+def calc_mfcc(wav_file_path):
+    fs, audio = wav.read(wav_file_path)
+    features = mfcc(audio, samplerate=fs, numcep=26)
+    return features
+    r = mfcc(audio, samplerate=fs, numcep=26)  # 2D array -> timesamples x mfcc_features
     t = np.transpose(r)  # 2D array ->  mfcc_features x timesamples
-    X = pad_sequences(t, maxlen=padlen, dtype='float', padding='post', truncating='post').T
-    return X  # 2D array -> MAXtimesamples x mfcc_features {778 x 26}
-
-
-def make_mfcc_shape(filename, padlen=778):
-    fs, audio = wav.read(filename)
-    r = p.mfcc(audio, samplerate=fs, numcep=26)  # 2D array -> timesamples x mfcc_features
-    t = np.transpose(r)  # 2D array ->  mfcc_features x timesamples
-    X = pad_sequences(t, maxlen=padlen, dtype='float', padding='post', truncating='post').T
-    return X  # 2D array -> MAXtimesamples x mfcc_features {778 x 26}
+    return pad_sequences(t, dtype='float', padding='post', truncating='post').T
 
 
 def get_xsize(val):
@@ -212,35 +269,6 @@ def shuffle_data(self):
                                                          self.transcript,
                                                          self.finish)
     return
-
-
-def aubio(source_filename):
-    # print("Usage: %s <source_filename> [samplerate] [win_s] [hop_s] [mode]" % sys.argv[0])
-    # print("  where [mode] can be 'delta' or 'ddelta' for first and second derivatives")7
-
-    n_filters = 40  # must be 40 for mfcc
-    n_coeffs = 26
-    win_s = 512
-    hop_s = win_s // 4
-    # mode = "default"
-    samplerate = 0
-
-    s = source(source_filename, samplerate, hop_s)
-    samplerate = s.samplerate
-    p = pvoc(win_s, hop_s)
-    m = mfcc(win_s, n_filters, n_coeffs, samplerate)
-
-    mfccs = zeros([n_coeffs, ])
-    frames_read = 0
-    while True:
-        samples, read = s()
-        spec = p(samples)
-        mfcc_out = m(spec)
-        mfccs = vstack((mfccs, mfcc_out))
-        frames_read += read
-        if read < hop_s: break
-
-    return mfccs
 
 
 ##Require for DS2 - source: https://github.com/baidu-research/ba-dls-deepspeech
@@ -349,20 +377,17 @@ def featurise(audio_clip):
         max_freq=max_freq)
 
 
-def read_data_from_csv(csv_path, sort=True, createwordlist=False):
+def read_data_from_csv(csv_path, sort=True, create_word_list=False):
     if not isfile(csv_path):
         print(f'ERROR: CSV file {csv_path} does not exist!', file=sys.stderr)
         exit(0)
 
-    print(f'Reading data from {csv_path}...')
+    print(f'Reading samples from {csv_path}...')
     df = pd.read_csv(csv_path, sep=',', encoding='utf-8')
-    print("...done!")
+    print(f'...done! Read {len(df.index)} samples.')
 
-    # can output the word list here if required
-    if createwordlist:
-        df['transcript'].to_csv("./lm/df_all_word_list.csv", sep=',', header=False, index=False)  # reorder + out
-
-    print("Total number of samples:", len(df.index))
+    if create_word_list:
+        df['transcript'].to_csv(join('lm', 'df_all_word_list.csv'), header=False, index=False)
 
     if sort:
         df = df.sort_values(by='wav_filesize', ascending=True)

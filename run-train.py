@@ -13,9 +13,9 @@ from os import makedirs
 from os.path import join, abspath, isdir
 
 from keras.callbacks import TensorBoard
-from keras.optimizers import Adam, SGD
+from keras.optimizers import SGD
 
-from generator import BatchGenerator, read_data_from_csv
+from generator import CSVBatchGenerator
 from model import *
 from report import ReportCallback
 from util.log_util import create_args_str
@@ -34,18 +34,20 @@ parser.add_argument('--train_files', type=str, default='',
                     help='list of all train files, seperated by a comma if multiple')
 parser.add_argument('--valid_files', type=str, default='',
                     help='list of all validation files, seperate by a comma if multiple')
-parser.add_argument('--train_steps', type=int, default=0, help='number of steps for each epoch. Use 0 for automatic')
-parser.add_argument('--valid_steps', type=int, default=0,
-                    help='number of validsteps for each epoch. Use 0 for automatic')
+parser.add_argument('--train_batches', type=int, default=0,
+                    help='number of batches to use for training in each epoch. Use 0 for automatic')
+parser.add_argument('--valid_batches', type=int, default=0,
+                    help='number of batches to use for validation in each epoch. Use 0 for automatic')
 parser.add_argument('--fc_size', type=int, default=512, help='fully connected size for model')
 parser.add_argument('--rnn_size', type=int, default=512, help='size of the RNN layer')
 parser.add_argument('--model_path', type=str, default='',
                     help="""If value set, load the checkpoint in a folder minus name minus the extension (weights 
                        assumed as same name diff ext) e.g. --model_path ./checkpoints/ TRIMMED_ds_ctc_model/""")
 parser.add_argument('--learning_rate', type=float, default=0.01, help='the learning rate used by the optimiser')
-parser.add_argument('--sorted', type=bool, default=True, help='sort utterances by their length in the first epoch')
+parser.add_argument('--sort_samples', type=bool, default=True,
+                    help='sort utterances by their length in the first epoch')
 parser.add_argument('--epochs', type=int, default=20, help='Number of epochs to train the model')
-parser.add_argument('--batchsize', type=int, default=16, help='batch_size used to train the model')
+parser.add_argument('--batch_size', type=int, default=16, help='batch_size used to train the model')
 parser.add_argument('--gpu', type=str, nargs='?', default='2', help='(optional) GPU(s) to use for training. Default: 2')
 args = parser.parse_args()
 
@@ -105,8 +107,10 @@ def create_model(output_dir):
 
 def train_model(model):
     print("Creating data batch generators")
-    data_train = BatchGenerator(args.train_files, sort=args.sorted, steps=args.train_steps, batch_size=args.batchsize)
-    data_valid = BatchGenerator(args.valid_files, sort=args.sorted, steps=args.valid_steps, batch_size=args.batchsize)
+    data_train = CSVBatchGenerator(args.train_files, shuffle=False, n_batches=args.train_batches,
+                                   batch_size=args.batch_size)
+    data_valid = CSVBatchGenerator(args.valid_files, shuffle=True, n_batches=args.valid_batches,
+                                   batch_size=args.batch_size)
 
     cb_list = []
     if args.memcheck:
@@ -120,10 +124,7 @@ def train_model(model):
 
     cb_list.append(report_cb)
 
-    model.fit_generator(generator=data_train.next_batch(), steps_per_epoch=data_train.num_batches,
-                        validation_data=data_valid.next_batch(), validation_steps=data_valid.num_batches,
-                        epochs=args.epochs,
-                        callbacks=cb_list)
+    model.fit_generator(generator=data_train, validation_data=data_valid, epochs=args.epochs, callbacks=cb_list)
 
     print("Mean WER   :", report_cb.mean_wer_log)
     print("Mean LER   :", report_cb.mean_ler_log)

@@ -23,22 +23,7 @@ class ReportCallback(callbacks.Callback):
         test_func = K.function([input_data, K.learning_phase()], [y_pred])
         self.test_func = test_func
 
-        self.validdata_next_val = self.data_valid.next_batch()
-        self.batch_size = data_valid.batch_size
-        self.save = save
-
-        # useful if you want to decrease amount in validation
-        self.valid_test_devide = 1  # 1=no reduce, 10 = 1/10th
-        # if socket.gethostname().lower() in 'rs-e5550'.lower(): self.valid_test_devide = 50
-
-        self.val_best_mean_ed = 0
-        self.val_best_norm_mean_ed = 0
-
-        self.lm = get_model()
-
-        self.model = model
-        self.runtimestr = runtimestr
-
+        # WER/LER history
         self.mean_wer_log = []
         self.mean_ler_log = []
         self.norm_mean_ler_log = []
@@ -48,13 +33,13 @@ class ReportCallback(callbacks.Callback):
         self.force_output = force_output
 
     def validate_epoch(self, epoch):
-        print(f'validating epoch {epoch}')
         K.set_learning_phase(0)
 
-        if self.shuffle_epoch_end:
-            print("shuffling validation data")
-            self.data_valid.genshuffle()
+        # if self.shuffle_data:
+        #     print("shuffling validation data")
+        #     self.data_valid.shuffle()
 
+        print(f'validating epoch {epoch}')
         originals, results = [], []
         self.data_valid.cur_index = 0  # reset index
 
@@ -65,12 +50,12 @@ class ReportCallback(callbacks.Callback):
         # make a pass through all the validation data and assess score
         for _ in tqdm(range(0, n_val_batches)):
 
-            word_batch = next(self.validdata_next_val)[0]
+            word_batch = next(self.data_valid)[0]
             decoded_res = decode_batch(self.test_func,
-                                       word_batch['the_input'][0:self.batch_size],
-                                       self.batch_size)
+                                       word_batch['the_input'][0:self.data_valid.batch_size],
+                                       self.data_valid.batch_size)
 
-            for j in range(0, self.batch_size):
+            for j in range(0, self.data_valid.batch_size):
                 label_actual = word_batch['source_str'][j]
                 label_decoded = decoded_res[j]
                 label_corrected = correction(label_decoded)
