@@ -102,6 +102,8 @@ class OldBatchGenerator(BatchGenerator):
         # print("Max batch time value is:", max_val)
 
         X_data = np.array([make_mfcc_shape(file_name, padlen=max_val) for file_name in batch_x])
+        print('should be:', (self.batch_size, max_val, 26))
+        print('is:', X_data.shape)
         assert (X_data.shape == (self.batch_size, max_val, 26))
 
         # 2. labels (made numerical)
