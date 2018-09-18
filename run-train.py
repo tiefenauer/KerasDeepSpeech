@@ -123,8 +123,8 @@ def train_model(model):
     report_cb = ReportCallback(data_valid, model, args.name)
     cb_list.append(report_cb)
 
-    model.fit_generator(generator=data_train.next_batch(),
-                        validation_data=data_valid.next_batch(),
+    model.fit_generator(generator=data_train,
+                        validation_data=data_valid,
                         steps_per_epoch=len(data_train),
                         validation_steps=len(data_valid),
                         epochs=args.epochs, callbacks=cb_list, workers=1)

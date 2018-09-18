@@ -58,7 +58,7 @@ class ReportCallback(callbacks.Callback):
         self.data_valid.cur_index = 0  # reset index
 
         for _ in tqdm(range(len(self.data_valid))):
-            batch_inputs, _ = next(self.data_valid.next_batch())
+            batch_inputs, _ = next(self.data_valid)
             decoded_res = decode_batch(self.test_func, batch_inputs['the_input'])
 
             for j in range(0, self.data_valid.batch_size):

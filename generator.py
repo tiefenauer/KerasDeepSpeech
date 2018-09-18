@@ -28,9 +28,6 @@ class BatchGenerator(object):
         return self
 
     def __next__(self):
-        return self.next_batch()
-
-    def next_batch(self):
         """
         Returns a generator for the dataset. Because for training the dataset is iterated over once per epoch, this
         function is an endless loop over set.
@@ -48,7 +45,7 @@ class BatchGenerator(object):
 
             ret = self.get_batch(self.cur_index)
             self.cur_index += 1
-            yield ret
+            return ret
 
     def get_batch(self, idx):
         index_array = range(idx * self.batch_size, (idx + 1) * self.batch_size)
