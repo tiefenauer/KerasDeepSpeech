@@ -101,7 +101,7 @@ def main(args):
 
     K.set_learning_phase(0)
     report = K.function([input_data, K.learning_phase()], [y_pred])
-    report_cb = ReportCallback(report, testdata, model, args.name, save=False)
+    report_cb = ReportCallback(report, testdata, model, args.name, save_progress=False)
     report_cb.force_output = True
     report_cb.on_epoch_end(0, logs=None)
 

@@ -120,8 +120,7 @@ def train_model(model):
         tb_cb = TensorBoard(log_dir=join('tensorboard', args.name), write_graph=False, write_images=True)
         cb_list.append(tb_cb)
 
-    report_cb = ReportCallback(data_valid, model, args.name, save=True)
-
+    report_cb = ReportCallback(data_valid, model, args.name)
     cb_list.append(report_cb)
 
     model.fit_generator(generator=data_train, validation_data=data_valid, epochs=args.epochs, callbacks=cb_list)

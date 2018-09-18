@@ -1,5 +1,4 @@
 import itertools
-import os
 import sys
 from os import makedirs
 from os.path import join, isdir
@@ -14,9 +13,29 @@ from utils import save_model, int_to_text_sequence
 
 
 class ReportCallback(callbacks.Callback):
-    def __init__(self, data_valid, model, runtimestr, save, force_output=False):
+    def __init__(self, data_valid, model, run_id, val_fraction=1, save_progress=True, early_stopping=True,
+                 shuffle_data=True, force_output=False):
+        """
+        Will calculate WER and LER at epoch end and print out infered transcriptions from validation set using the 
+        current model and weights
+        :param data_valid: validation data
+        :param model: compiled model
+        :param run_id: string that identifies the current run
+        :param val_fraction: fraction of the validation data to use for validation (10 = one tenth)
+        :param save_progress: 
+        :param early_stopping: 
+        :param shuffle_data: 
+        :param force_output: 
+        """
         super().__init__()
         self.data_valid = data_valid
+        self.model = model
+        self.run_id = run_id
+        self.val_fraction = val_fraction
+        self.save_progress = save_progress
+        self.early_stopping = early_stopping
+        self.shuffle_data = shuffle_data
+        self.force_output = force_output
 
         y_pred = model.get_layer('ctc').input[0]
         input_data = model.get_layer('the_input').input
@@ -27,10 +46,6 @@ class ReportCallback(callbacks.Callback):
         self.mean_wer_log = []
         self.mean_ler_log = []
         self.norm_mean_ler_log = []
-
-        self.earlystopping = True
-        self.shuffle_epoch_end = True
-        self.force_output = force_output
 
     def validate_epoch(self, epoch):
         K.set_learning_phase(0)
@@ -44,8 +59,8 @@ class ReportCallback(callbacks.Callback):
         self.data_valid.cur_index = 0  # reset index
 
         n_val_batches = len(self.data_valid.wav_files) // self.data_valid.batch_size
-        if self.valid_test_devide:
-            n_val_batches = n_val_batches // self.valid_test_devide
+        if self.val_fraction:
+            n_val_batches = n_val_batches // self.val_fraction
 
         # make a pass through all the validation data and assess score
         for _ in tqdm(range(0, n_val_batches)):
@@ -90,7 +105,7 @@ class ReportCallback(callbacks.Callback):
         self.validate_epoch(epoch)
 
         # early stopping if VAL WER worse 4 times in a row
-        if self.earlystopping and is_early_stopping(self.mean_wer_log):
+        if self.early_stopping and is_early_stopping(self.mean_wer_log):
             print("EARLY STOPPING")
             print("Mean WER   :", self.mean_wer_log)
             print("Mean LER   :", self.mean_ler_log)
@@ -99,8 +114,8 @@ class ReportCallback(callbacks.Callback):
             sys.exit()
 
         # save checkpoint if last LER or last WER was better than all previous values
-        if self.save and (new_benchmark(self.mean_ler_log) or new_benchmark(self.mean_wer_log)):
-            save_dir = join('checkpoints', 'epoch', f'LER-WER-best-{self.runtimestr}')
+        if self.save_progress and (new_benchmark(self.mean_ler_log) or new_benchmark(self.mean_wer_log)):
+            save_dir = join('checkpoints', 'epoch', f'LER-WER-best-{self.run_id}')
             print(f'New WER or LER benchmark! Saving model and weights at {save_dir}')
             if not isdir(save_dir):
                 makedirs(save_dir)

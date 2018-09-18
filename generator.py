@@ -141,7 +141,7 @@ class OldBatchGenerator(object):
 
                 if self.shuffle:
                     print("SHUFFLING as reached end of data")
-                    self.genshuffle()
+                    self.shuffle()
 
             try:
                 ret = self.get_batch(self.cur_index)
@@ -154,10 +154,8 @@ class OldBatchGenerator(object):
 
             yield ret
 
-    def genshuffle(self):
-        self.wav_files, self.transcripts, self.wav_sizes = shuffle(self.wav_files,
-                                                                   self.transcripts,
-                                                                   self.wav_sizes)
+    def shuffle(self):
+        self.wav_files, self.transcripts, self.wav_sizes = shuffle(self.wav_files, self.transcripts, self.wav_sizes)
 
     def export_test_mfcc(self):
         # this is used to export data e.g. into iOS
