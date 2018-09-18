@@ -22,10 +22,12 @@ class BatchGenerator(Iterator, ABC):
 
     def _get_batches_of_transformed_samples(self, index_array):
         features = self.extract_features(index_array)
-        labels = self.extract_labels(index_array)
+        X = pad_sequences(features, dtype='float32', padding='post')
+        X_lengths = np.array([feature.shape[0] for feature in features])
 
-        X, X_lengths = self.make_batch_inputs(features)
-        Y, Y_lengths = self.make_batch_outputs(labels)
+        labels = self.extract_labels(index_array)
+        Y = pad_sequences([text_to_int_sequence(label) for label in labels], padding='post', value=27)
+        Y_lengths = np.array([len(label) for label in labels])
 
         inputs = {
             'the_input': X,
@@ -48,24 +50,12 @@ class BatchGenerator(Iterator, ABC):
         index_array.sort()
         return self._get_batches_of_transformed_samples(index_array.tolist())
 
-    @staticmethod
-    def make_batch_inputs(features):
-        batch_inputs = pad_sequences(features, dtype='float32', padding='post')
-        batch_inputs_len = np.array([feature.shape[0] for feature in features])
-        return batch_inputs, batch_inputs_len
-
-    @staticmethod
-    def make_batch_outputs(labels):
-        batch_outputs = pad_sequences([text_to_int_sequence(label) for label in labels], padding='post', value=27)
-        batch_outputs_len = np.array([len(label) for label in labels])
-        return batch_outputs, batch_outputs_len
-
     @abstractmethod
     def extract_features(self, index_array):
         """
         Extract unpadded features for a batch of elements with specified indices
         :param index_array: array with indices of elements in current batch
-        :return: list of unpadded features
+        :return: list of unpadded features (batch_size x num_timesteps x num_features)
         """
         raise NotImplementedError
 
@@ -195,10 +185,14 @@ class CSVBatchGenerator(BatchGenerator):
         del df
 
     def extract_features(self, index_array):
-        return [calc_mfcc(wav_file) for wav_file in (self.wav_files[i] for i in index_array)]
+        return [self.extract_mfcc(wav_file) for wav_file in (self.wav_files[i] for i in index_array)]
 
     def extract_labels(self, index_array):
         return [self.transcripts[i] for i in index_array]
+
+    def extract_mfcc(self, wav_file_path):
+        fs, audio = wav.read(wav_file_path)
+        return mfcc(audio, samplerate=fs, numcep=26)  # (num_timesteps x num_features)
 
 
 def get_normalise(self, k_samples=100):
