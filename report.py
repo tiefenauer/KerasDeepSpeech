@@ -50,9 +50,9 @@ class ReportCallback(callbacks.Callback):
     def validate_epoch(self, epoch):
         K.set_learning_phase(0)
 
-        # if self.shuffle_data:
-        #     print("shuffling validation data")
-        #     self.data_valid.shuffle()
+        if self.shuffle_data:
+            print("shuffling validation data")
+            self.data_valid.shuffle_entries()
 
         print(f'validating epoch {epoch}')
         originals, results = [], []

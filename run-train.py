@@ -15,7 +15,7 @@ from os.path import join, abspath, isdir
 from keras.callbacks import TensorBoard
 from keras.optimizers import SGD
 
-from generator import CSVBatchGenerator, OldBatchGenerator
+from generator import CSVBatchGenerator
 from model import *
 from report import ReportCallback
 from util.log_util import create_args_str
@@ -127,7 +127,7 @@ def train_model(model):
                         validation_data=data_valid.next_batch(),
                         steps_per_epoch=len(data_train),
                         validation_steps=len(data_valid),
-                        epochs=args.epochs, callbacks=cb_list)
+                        epochs=args.epochs, callbacks=cb_list, workers=1)
 
     print("Mean WER   :", report_cb.mean_wer_log)
     print("Mean LER   :", report_cb.mean_ler_log)
