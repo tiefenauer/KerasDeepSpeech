@@ -1,86 +1,71 @@
 # this file is an adaptation from the work at mozilla deepspeech github.com/mozilla/DeepSpeech
 
-
 import kenlm
 import re
 from heapq import heapify
 
-from pattern3.metrics import levenshtein_similarity
+import numpy as np
+from pattern3.metrics import levenshtein_similarity, levenshtein
 
 
-def wer(original, result):
+def wer(ground_truth, prediction):
     """
-    The WER is defined as the editing/Levenshtein distance on word level (not on character-level!) divided by the number
-    of words in the original text.
-    In case of the original having more words (N) than the result and both
-    being totally different (all N words resulting in 1 edit operation each),
-    the WER will always be 1 (N / N = 1).
+    The WER is defined as the editing/Levenshtein distance on word level (not on character-level!).
+    The score is normalized to a value between 0 and 1.
     """
-    return levenshtein_similarity(original.split(), result.split())
-    # return levenshtein(original.split(), result.split()) / float(len(original))
+    return 1 - levenshtein_similarity(ground_truth.split(), prediction.split())
 
 
-def wers(originals, results):
-    count = len(originals)
-    try:
-        assert count > 0
-    except:
-        print(originals)
-        raise ("ERROR assert count>0 - looks like data is missing")
-    rates = []
-    mean = 0.0
-    assert count == len(results)
-    for i in range(count):
-        rate = wer(originals[i], results[i])
-        mean = mean + rate
-        rates.append(rate)
-    return rates, mean / float(count)
+def wers(ground_truths, predictions):
+    assert len(ground_truths) > 0, f'ERROR assert len(ground_truth) > 0: looks like data is missing!'
+    rates = [wer(ground_truth, prediction) for (ground_truth, prediction) in zip(ground_truths, predictions)]
+    return rates, np.mean(rates)
 
 
-def lers(originals, results):
-    count = len(originals)
-    assert count > 0
-    rates = []
-    norm_rates = []
+def lers(ground_truths, predictions):
+    assert len(ground_truths) > 0, f'ERROR assert len(ground_truth) > 0: looks like data is missing!'
+    assert len(ground_truths) == len(predictions), f'ERROR: not same number of ground truths and predictions!'
+    rates = [levenshtein(truth, pred) for (truth, pred) in zip(ground_truths, predictions)]
+    norm_rates = [1-levenshtein_similarity(truth, pred) for (truth, pred) in zip(ground_truths, predictions)]
+    return rates, np.mean(rates), norm_rates, np.mean(norm_rates)
 
-    mean = 0.0
-    norm_mean = 0.0
-
-    assert count == len(results)
-    for i in range(count):
-        rate = levenshtein(originals[i], results[i])
-        mean = mean + rate
-
-        normrate = (float(rate) / len(originals[i]))
-
-        norm_mean = norm_mean + normrate
-
-        rates.append(rate)
-        norm_rates.append(round(normrate, 4))
-
-    return rates, (mean / float(count)), norm_rates, (norm_mean / float(count))
+    # mean = 0.0
+    # norm_mean = 0.0
+    #
+    # for i in range(count):
+    #     rate = levenshtein(ground_truths[i], predictions[i])
+    #     mean = mean + rate
+    #
+    #     normrate = (float(rate) / len(ground_truths[i]))
+    #
+    #     norm_mean = norm_mean + normrate
+    #
+    #     rates.append(rate)
+    #     norm_rates.append(round(normrate, 4))
+    #
+    # return rates, (mean / float(count)), norm_rates, (norm_mean / float(count))
 
 
 # The following code is from: http://hetland.org/coding/python/levenshtein.py
-def levenshtein(a, b):
-    "Calculates the Levenshtein distance between a and b."
-    n, m = len(a), len(b)
-    if n > m:
-        # Make sure n <= m, to use O(min(n,m)) space
-        a, b = b, a
-        n, m = m, n
-
-    current = list(range(n + 1))
-    for i in range(1, m + 1):
-        previous, current = current, [i] + [0] * n
-        for j in range(1, n + 1):
-            add, delete = previous[j] + 1, current[j - 1] + 1
-            change = previous[j - 1]
-            if a[j - 1] != b[i - 1]:
-                change = change + 1
-            current[j] = min(add, delete, change)
-
-    return current[n]
+# def levenshtein(a, b):
+#     "Calculates the Levenshtein distance between a and b."
+#     n, m = len(a), len(b)
+#     if n > m:
+#         # Make sure n <= m, to use O(min(n,m)) space
+#         a, b = b, a
+#         n, m = m, n
+#
+#     current = list(range(n + 1))
+#     for i in range(1, m + 1):
+#         previous, current = current, [i] + [0] * n
+#         for j in range(1, n + 1):
+#             add, delete = previous[j] + 1, current[j - 1] + 1
+#             change = previous[j - 1]
+#             if a[j - 1] != b[i - 1]:
+#                 change = change + 1
+#             current[j] = min(add, delete, change)
+#
+#     return current[n]
 
 
 # Lazy-load language model (TED corpus, Kneser-Ney, 4-gram, 30k word LM)

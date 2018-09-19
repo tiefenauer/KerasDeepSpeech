@@ -77,18 +77,18 @@ class ReportCallback(callbacks.Callback):
                 originals.append(label_actual)
                 results.append(label_corrected)
 
-        rates, mean = wers(originals, results)
-        lrates, lmean, norm_lrates, norm_lmean = lers(originals, results)
+        wer_values, wer_mean = wers(originals, results)
+        ler_values, ler_mean, ler_values_norm, ler_values_norm_mean = lers(originals, results)
         print("########################################################")
         print("Validation results: WER & LER (using LM)")
-        print("WER average is   :", mean)
-        print("LER average is   :", lmean)
-        print("normalised LER is:", norm_lmean)
+        print("WER average is   :", wer_mean)
+        print("LER average is   :", ler_mean)
+        print("normalised LER is:", ler_values_norm_mean)
         print("########################################################")
 
-        self.mean_wer_log.append(mean)
-        self.mean_ler_log.append(lmean)
-        self.norm_mean_ler_log.append(norm_lmean)
+        self.mean_wer_log.append(wer_mean)
+        self.mean_ler_log.append(ler_mean)
+        self.norm_mean_ler_log.append(ler_values_norm_mean)
 
         K.set_learning_phase(1)
 
