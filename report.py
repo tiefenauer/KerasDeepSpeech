@@ -9,13 +9,12 @@ from keras import callbacks
 from tqdm import tqdm
 
 from text import *
-from util.rnn_util import decode
 from utils import save_model, int_to_text_sequence
 
 
 class ReportCallback(callbacks.Callback):
     def __init__(self, data_valid, model, run_id, save_progress=True, early_stopping=True, shuffle_data=True,
-                 force_output=True):
+                 force_output=False):
         """
         Will calculate WER and LER at epoch end and print out infered transcriptions from validation set using the 
         current model and weights

@@ -5,6 +5,7 @@ import kenlm
 import re
 from heapq import heapify
 
+
 def wer(original, result):
     r"""
     The WER is defined as the editing/Levenshtein distance on word level
@@ -17,8 +18,8 @@ def wer(original, result):
     # Therefore we split the strings into words first:
     original = original.split()
     result = result.split()
-    print(f'original: {original}, result: {result}')
     return levenshtein(original, result) / float(len(original))
+
 
 def wers(originals, results):
     count = len(originals)
@@ -26,7 +27,7 @@ def wers(originals, results):
         assert count > 0
     except:
         print(originals)
-        raise("ERROR assert count>0 - looks like data is missing")
+        raise ("ERROR assert count>0 - looks like data is missing")
     rates = []
     mean = 0.0
     assert count == len(results)
@@ -35,6 +36,7 @@ def wers(originals, results):
         mean = mean + rate
         rates.append(rate)
     return rates, mean / float(count)
+
 
 def lers(originals, results):
     count = len(originals)
@@ -57,37 +59,36 @@ def lers(originals, results):
         rates.append(rate)
         norm_rates.append(round(normrate, 4))
 
-    return rates, (mean / float(count)), norm_rates, (norm_mean/float(count))
+    return rates, (mean / float(count)), norm_rates, (norm_mean / float(count))
 
 
 # The following code is from: http://hetland.org/coding/python/levenshtein.py
-def levenshtein(a,b):
+def levenshtein(a, b):
     "Calculates the Levenshtein distance between a and b."
     n, m = len(a), len(b)
     if n > m:
         # Make sure n <= m, to use O(min(n,m)) space
-        a,b = b,a
-        n,m = m,n
+        a, b = b, a
+        n, m = m, n
 
-    current = list(range(n+1))
-    for i in range(1,m+1):
-        previous, current = current, [i]+[0]*n
-        for j in range(1,n+1):
-            add, delete = previous[j]+1, current[j-1]+1
-            change = previous[j-1]
-            if a[j-1] != b[i-1]:
+    current = list(range(n + 1))
+    for i in range(1, m + 1):
+        previous, current = current, [i] + [0] * n
+        for j in range(1, n + 1):
+            add, delete = previous[j] + 1, current[j - 1] + 1
+            change = previous[j - 1]
+            if a[j - 1] != b[i - 1]:
                 change = change + 1
             current[j] = min(add, delete, change)
 
     return current[n]
 
 
-
 # Lazy-load language model (TED corpus, Kneser-Ney, 4-gram, 30k word LM)
 def get_model():
     global MODEL
     if MODEL is None:
-        #MODEL = kenlm.Model('./lm/timit-lm.klm')
+        # MODEL = kenlm.Model('./lm/timit-lm.klm')
         MODEL = kenlm.Model('./lm/libri-timit-lm.klm')
     return MODEL
 
@@ -138,6 +139,7 @@ def edits1(word):
 def edits2(word):
     "All edits that are two edits away from `word`."
     return (e2 for e1 in edits1(word) for e2 in edits1(e1))
+
 
 # globals
 
