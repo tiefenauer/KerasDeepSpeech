@@ -10,7 +10,6 @@ from keras.preprocessing.sequence import pad_sequences
 from python_speech_features import mfcc
 from sklearn.utils import shuffle
 
-from util.rnn_util import encode
 from utils import text_to_int_sequence
 
 
@@ -22,7 +21,7 @@ class BatchGenerator(object):
         self.cur_index = 0
 
     def __len__(self):
-        return self.n // self.batch_size # number of batches
+        return self.n // self.batch_size  # number of batches
 
     def __iter__(self):
         return self
@@ -97,15 +96,26 @@ class CSVBatchGenerator(BatchGenerator):
         self.wav_files = df['wav_filename'].tolist()
         self.wav_sizes = df['wav_filesize'].tolist()
         self.transcripts = df['transcript'].tolist()
+        self.wav_features = [None] * len(self.wav_files)
 
         super().__init__(n=len(df.index), batch_size=batch_size, shuffle=shuffle)
         del df
 
     def shuffle_entries(self):
-        self.wav_files, self.transcripts, self.wav_sizes = shuffle(self.wav_files, self.transcripts, self.wav_sizes)
+        self.wav_files, self.transcripts, self.wav_sizes, self.wav_features = shuffle(self.wav_files, self.transcripts,
+                                                                                      self.wav_sizes, self.wav_features)
 
     def extract_features(self, index_array):
-        return [extract_mfcc(wav_file) for wav_file in (self.wav_files[i] for i in index_array)]
+        features = []
+        for i in index_array:
+            if i < len(self.wav_features) and self.wav_features[i] is not None:
+                features.append(self.wav_features[i])
+            else:
+                feature = extract_mfcc(self.wav_files[i])
+                self.wav_features[i] = feature
+                features.append(feature)
+        return features
+        # return [extract_mfcc(wav_file) for wav_file in (self.wav_files[i] for i in index_array)]
 
     def extract_labels(self, index_array):
         return [self.transcripts[i] for i in index_array]
