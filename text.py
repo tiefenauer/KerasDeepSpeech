@@ -10,12 +10,20 @@ from pattern3.metrics import levenshtein_similarity, levenshtein
 from util.rnn_util import ALLOWED_CHARS
 
 
+def ler(ground_truth, prediction):
+    """
+    The LER is defined as the edit distance between two strings
+    The score is normalized to a value between 0 and 1
+    """
+    return 1 - levenshtein_similarity(ground_truth, prediction)
+
+
 def wer(ground_truth, prediction):
     """
     The WER is defined as the editing/Levenshtein distance on word level (not on character-level!).
     The score is normalized to a value between 0 and 1.
     """
-    return 1 - levenshtein_similarity(ground_truth.split(), prediction.split())
+    return ler(ground_truth.split(), prediction.split())
 
 
 def wers(ground_truths, predictions):
@@ -27,8 +35,8 @@ def wers(ground_truths, predictions):
 def lers(ground_truths, predictions):
     assert len(ground_truths) > 0, f'ERROR assert len(ground_truth) > 0: looks like data is missing!'
     assert len(ground_truths) == len(predictions), f'ERROR: not same number of ground truths and predictions!'
-    rates = [levenshtein(truth, pred) for (truth, pred) in zip(ground_truths, predictions)]
-    norm_rates = [1 - levenshtein_similarity(truth, pred) for (truth, pred) in zip(ground_truths, predictions)]
+    rates = [levenshtein(ground_truth, prediction) for (ground_truth, prediction) in zip(ground_truths, predictions)]
+    norm_rates = [ler(ground_truth, prediction) for (ground_truth, prediction) in zip(ground_truths, predictions)]
     return rates, np.mean(rates), norm_rates, np.mean(norm_rates)
 
 

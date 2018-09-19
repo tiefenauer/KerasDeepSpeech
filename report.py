@@ -5,6 +5,7 @@ from os.path import join, isdir
 
 import keras.backend as K
 from keras import callbacks
+from tabulate import tabulate
 from tqdm import tqdm
 
 from text import *
@@ -56,26 +57,37 @@ class ReportCallback(callbacks.Callback):
         originals, results = [], []
         self.data_valid.cur_index = 0  # reset index
 
+        validation_results = []
+
         for _ in tqdm(range(len(self.data_valid))):
             batch_inputs, _ = next(self.data_valid)
             decoded_res = decode_batch(self.test_func, batch_inputs['the_input'])
 
             for j in range(0, self.data_valid.batch_size):
-                label_actual = batch_inputs['source_str'][j]
-                label_decoded = decoded_res[j]
-                label_corrected = correction(label_decoded)
+                ground_truth = batch_inputs['source_str'][j]
+                pred = decoded_res[j]
+                pred_lm = correction(pred)
 
-                wer_decoded = wer(label_actual, label_decoded)
-                wer_corrected = wer(label_actual, label_corrected)
+                wer_decoded = wer(ground_truth, pred)
+                wer_corrected = wer(ground_truth, pred_lm)
 
-                if self.force_output or wer_decoded < 0.4 or wer_corrected < 0.4:
-                    print(f'{j} GroundTruth:{label_actual}')
-                    print(f'{j} Transcribed:{label_decoded}')
-                    print(f'{j} LMCorrected:{label_corrected}')
+                if wer_decoded < 0.4 or wer_corrected < 0.4:
+                    ler_pred = ler(ground_truth, pred)
+                    wer_pred = wer(ground_truth, pred)
+                    ler_lm = ler(ground_truth, pred_lm)
+                    wer_lm = wer(ground_truth, pred_lm)
 
-                originals.append(label_actual)
-                results.append(label_corrected)
+                    validation_results.append((ground_truth, pred, ler_pred, wer_pred, pred_lm, ler_lm, wer_lm))
+                    # print(f'{j} Ground Truth:              {ground_truth}')
+                    # print(f'{j} Prediction:                {prediction}')
+                    # print(f'{j} Prediction (LM-corrected): {prediction_lm}')
 
+                originals.append(ground_truth)
+                results.append(pred_lm)
+
+        if self.force_output:
+            headers = ['Ground Truth', 'Prediction', 'LER', 'WER', 'Prediction (LM-corrected)', 'LER', 'WER']
+            print(tabulate(validation_results, headers=headers))
         wer_values, wer_mean = wers(originals, results)
         ler_values, ler_mean, ler_values_norm, ler_values_norm_mean = lers(originals, results)
         print("########################################################")
@@ -139,7 +151,7 @@ def is_early_stopping(wer_logs):
 
     last = wer_logs[-1]
     rest = wer_logs[-5:-1]
-    print(last, " vs ", rest)
+    print(f'{last} vs {rest}')
 
     return all(i <= last for i in rest)
 
