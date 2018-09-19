@@ -4,13 +4,12 @@ from os import makedirs
 from os.path import join, isdir
 
 import keras.backend as K
-import numpy as np
 from keras import callbacks
 from tqdm import tqdm
 
 from text import *
 from util.rnn_util import decode
-from utils import save_model, int_to_text_sequence
+from utils import save_model
 
 
 class ReportCallback(callbacks.Callback):

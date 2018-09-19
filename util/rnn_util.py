@@ -6,7 +6,8 @@ import numpy as np
 # 29 target classes
 # <space> = 0, a=1, b=2, ..., z=26, '=27, _ (padding token) = 28
 SPACE_TOKEN = '<space>'
-CHAR_TOKENS = ' ' + string.ascii_lowercase + '\''
+ALLOWED_CHARS = string.ascii_lowercase  # add umlauts here
+CHAR_TOKENS = ' ' + ALLOWED_CHARS + '\''
 
 
 def tokenize(text):

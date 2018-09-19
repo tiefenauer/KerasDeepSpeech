@@ -11,7 +11,6 @@ from python_speech_features import mfcc
 from sklearn.utils import shuffle
 
 from util.rnn_util import encode
-from utils import text_to_int_sequence
 
 
 class BatchGenerator(object):
