@@ -7,10 +7,10 @@ import numpy as np
 import pandas as pd
 import scipy.io.wavfile as wav
 from keras.preprocessing.sequence import pad_sequences
+from keras.utils import HDF5Matrix
 from python_speech_features import mfcc
 from sklearn.utils import shuffle
 
-from util.rnn_util import encode
 from utils import text_to_int_sequence
 
 
@@ -22,7 +22,7 @@ class BatchGenerator(object):
         self.cur_index = 0
 
     def __len__(self):
-        return self.n // self.batch_size # number of batches
+        return self.n // self.batch_size  # number of batches
 
     def __iter__(self):
         return self
@@ -87,6 +87,24 @@ class BatchGenerator(object):
         raise NotImplementedError
 
 
+class HDF5BatchGenerator(BatchGenerator):
+
+    def __init__(self, h5_path, dataset_name, shuffle=False, n_batches=None, batch_size=16):
+        self.features = HDF5Matrix(h5_path, f'{dataset_name}/features', normalizer=reshape_h5_entry)
+        self.transcripts = HDF5Matrix(h5_path, f'{dataset_name}/labels')
+        self.dataset_name = dataset_name
+        super().__init__(len(self.features), shuffle, batch_size)
+
+    def shuffle_entries(self):
+        pass
+
+    def extract_features(self, index_array):
+        return [self.features[i] for i in index_array]
+
+    def extract_labels(self, index_array):
+        return [self.transcripts[i] for i in index_array]
+
+
 class CSVBatchGenerator(BatchGenerator):
 
     def __init__(self, csv_path, shuffle=False, n_batches=None, batch_size=16):
@@ -132,3 +150,10 @@ def read_data_from_csv(csv_path, sort=True, create_word_list=False):
 def extract_mfcc(wav_file_path):
     fs, audio = wav.read(wav_file_path)
     return mfcc(audio, samplerate=fs, numcep=26)  # (num_timesteps x num_features)
+
+
+def reshape_h5_entry(inps):
+    if inps.dtype == np.object:
+        # reshaping a slice of features
+        return np.array([inp.reshape((-1, 26)) for inp in inps])
+    return inps.reshape((-1, 26))

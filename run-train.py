@@ -9,13 +9,13 @@ import argparse
 import datetime
 import os
 import sys
-from os import makedirs
-from os.path import join, abspath, isdir
+from os import makedirs, listdir
+from os.path import join, abspath, isdir, dirname
 
 from keras.callbacks import TensorBoard
 from keras.optimizers import SGD
 
-from generator import CSVBatchGenerator
+from generator import CSVBatchGenerator, HDF5BatchGenerator
 from model import *
 from report import ReportCallback
 from util.log_util import create_args_str
@@ -107,10 +107,21 @@ def create_model(output_dir):
 
 def train_model(model):
     print("Creating data batch generators")
-    data_train = CSVBatchGenerator(args.train_files, shuffle=False, n_batches=args.train_batches,
-                                   batch_size=args.batch_size)
-    data_valid = CSVBatchGenerator(args.valid_files, shuffle=True, n_batches=args.valid_batches,
-                                   batch_size=args.batch_size)
+    root_dir = dirname(args.train_files)
+    h5_features = list(join(root_dir, file) for file in listdir(root_dir) if file == 'features_mfcc.h5')
+    if h5_features:
+        h5_file = h5_features[0]
+        print(f'found precomputed HDF5 features at {h5_file}')
+        data_train = HDF5BatchGenerator(h5_file, dataset_name='train', shuffle=False, n_batches=args.train_batches,
+                                        batch_size=args.batch_size)
+        data_valid = HDF5BatchGenerator(h5_file, dataset_name='valid', shuffle=False, n_batches=args.train_batches,
+                                        batch_size=args.batch_size)
+    else:
+        print(f'did not find precomputed features at {root_dir}. Calculating features on-the-fly')
+        data_train = CSVBatchGenerator(args.train_files, shuffle=False, n_batches=args.train_batches,
+                                       batch_size=args.batch_size)
+        data_valid = CSVBatchGenerator(args.valid_files, shuffle=True, n_batches=args.valid_batches,
+                                       batch_size=args.batch_size)
 
     cb_list = []
     if args.memcheck:
