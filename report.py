@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 from text import *
 from util.rnn_util import decode
-from utils import save_model
+from utils import save_model, int_to_text_sequence
 
 
 class ReportCallback(callbacks.Callback):
@@ -123,8 +123,8 @@ def decode_batch(test_func, word_batch):
     for out in y_pred:
         best = list(np.argmax(out, axis=1))
         merge = [k for k, g in itertools.groupby(best)]
-        outStr = decode(merge)
-        ret.append(outStr)
+        outStr = int_to_text_sequence(merge)
+        ret.append(''.join(outStr))
 
     return ret
 

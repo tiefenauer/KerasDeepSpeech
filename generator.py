@@ -11,6 +11,7 @@ from python_speech_features import mfcc
 from sklearn.utils import shuffle
 
 from util.rnn_util import encode
+from utils import text_to_int_sequence
 
 
 class BatchGenerator(object):
@@ -47,7 +48,7 @@ class BatchGenerator(object):
         X_lengths = np.array([feature.shape[0] for feature in features])
 
         labels = self.extract_labels(index_array)
-        Y = pad_sequences([encode(label) for label in labels], padding='post', value=28)
+        Y = pad_sequences([text_to_int_sequence(label) for label in labels], padding='post', value=28)
         Y_lengths = np.array([len(label) for label in labels])
 
         inputs = {
