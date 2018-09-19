@@ -14,7 +14,7 @@ from utils import save_model
 
 
 class ReportCallback(callbacks.Callback):
-    def __init__(self, data_valid, model, run_id, save_progress=True, early_stopping=True, shuffle_data=True,
+    def __init__(self, data_valid, model, run_id, save_progress=True, early_stopping=False, shuffle_data=True,
                  force_output=False):
         """
         Will calculate WER and LER at epoch end and print out infered transcriptions from validation set using the 
@@ -53,7 +53,7 @@ class ReportCallback(callbacks.Callback):
             print("shuffling validation data")
             self.data_valid.shuffle_entries()
 
-        print(f'validating epoch {epoch}')
+        print(f'validating epoch {epoch+1}')
         originals, results = [], []
         self.data_valid.cur_index = 0  # reset index
 
