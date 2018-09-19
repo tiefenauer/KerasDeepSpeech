@@ -15,8 +15,17 @@ from utils import save_model
 
 def decode_batch_keras(y_pred, input_length, greedy=True):
     # https://www.dlology.com/blog/how-to-train-a-keras-model-to-recognize-variable-length-text/
-    decoded_int = K.get_value(K.ctc_decode(y_pred=y_pred, input_length=input_length, greedy=greedy)[0][0])
-    return [decode(int_seq) for int_seq in decoded_int]
+    if greedy:
+        decoded_int = K.get_value(K.ctc_decode(y_pred=y_pred, input_length=input_length, greedy=True)[0][0])
+        decoded_str = [decode(int_seq) for int_seq in decoded_int]
+    else:
+        results = []
+        top_results, _ = K.ctc_decode(y_pred=y_pred, input_length=input_length, greedy=False)
+        best = top_results[0]
+        for int_seq in K.get_value(best):
+            results.append(decode(int_seq))
+        decoded_str = results[0]
+    return decoded_str
 
 
 class ReportCallback(callbacks.Callback):
@@ -67,14 +76,15 @@ class ReportCallback(callbacks.Callback):
 
         for _ in tqdm(range(len(self.data_valid))):
             batch_inputs, _ = next(self.data_valid)
-            # decoded_res = decode_batch(self.test_func, batch_inputs['the_input'])
+            decoded_res = decode_batch(self.test_func, batch_inputs['the_input'])
             y_pred_0 = batch_inputs['the_input']
             input_length_0 = batch_inputs['input_length']
             decoded_res_0 = decode_batch_keras(y_pred_0, input_length_0)
 
             y_pred_1 = self.test_func([batch_inputs['the_input']])[0]
             input_length_1 = batch_inputs['label_length']
-            decoded_res_1 = decode_batch_keras(y_pred_1, input_length_1)
+            decoded_res_greedy = decode_batch_keras(y_pred_1, input_length_1, greedy=True)
+            decoded_res_beam = decode_batch_keras(y_pred_1, input_length_1, greedy=False)
 
             y_pred_3 = self.test_func([batch_inputs['the_input']])[0]
             input_length_3 = batch_inputs['input_length']
@@ -82,29 +92,24 @@ class ReportCallback(callbacks.Callback):
 
             for j in range(0, self.data_valid.batch_size):
                 ground_truth = batch_inputs['source_str'][j]
-                pred = decoded_res_1[j]
+                pred = decoded_res_greedy[j]
                 pred_lm = correction(pred)
 
-                wer_decoded = wer(ground_truth, pred)
-                wer_corrected = wer(ground_truth, pred_lm)
+                ler_pred = ler(ground_truth, pred)
+                ler_lm = ler(ground_truth, pred_lm)
 
-                if self.force_output or wer_decoded < 0.4 or wer_corrected < 0.4:
-                    ler_pred = ler(ground_truth, pred)
-                    wer_pred = wer(ground_truth, pred)
-                    ler_lm = ler(ground_truth, pred_lm)
-                    wer_lm = wer(ground_truth, pred_lm)
+                wer_pred = wer(ground_truth, pred)
+                wer_lm = wer(ground_truth, pred_lm)
 
+                if self.force_output or wer_pred < 0.4 or wer_lm < 0.4:
                     validation_results.append((ground_truth, pred, ler_pred, wer_pred, pred_lm, ler_lm, wer_lm))
-                    # print(f'{j} Ground Truth:              {ground_truth}')
-                    # print(f'{j} Prediction:                {prediction}')
-                    # print(f'{j} Prediction (LM-corrected): {prediction_lm}')
 
                 originals.append(ground_truth)
                 results.append(pred_lm)
 
         if validation_results:
             headers = ['Ground Truth', 'Prediction', 'LER', 'WER', 'Prediction (LM-corrected)', 'LER', 'WER']
-            print(tabulate(validation_results, headers=headers))
+            print(tabulate(validation_results, headers=headers, floatfmt=".4f"))
         wer_values, wer_mean = wers(originals, results)
         ler_values, ler_mean, ler_values_norm, ler_values_norm_mean = lers(originals, results)
         print("########################################################")
