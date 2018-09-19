@@ -12,6 +12,7 @@ import sys
 from os import makedirs
 from os.path import join, abspath, isdir
 
+import tensorflow as tf
 from keras.callbacks import TensorBoard
 from keras.optimizers import SGD
 
@@ -83,6 +84,11 @@ def setup():
         args.valid_files = abspath(join(test_path, "ldc93s1.csv"))
 
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
+    config = tf.ConfigProto()
+    config.gpu_options.visible_device_list = args.gpu
+    config.gpu_options.allow_growth = True
+    session = tf.Session(config=config)
+    K.set_session(session)
 
     return output_dir
 
