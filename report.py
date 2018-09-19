@@ -71,7 +71,7 @@ class ReportCallback(callbacks.Callback):
                 wer_decoded = wer(ground_truth, pred)
                 wer_corrected = wer(ground_truth, pred_lm)
 
-                if wer_decoded < 0.4 or wer_corrected < 0.4:
+                if self.force_output or wer_decoded < 0.4 or wer_corrected < 0.4:
                     ler_pred = ler(ground_truth, pred)
                     wer_pred = wer(ground_truth, pred)
                     ler_lm = ler(ground_truth, pred_lm)
@@ -85,7 +85,7 @@ class ReportCallback(callbacks.Callback):
                 originals.append(ground_truth)
                 results.append(pred_lm)
 
-        if self.force_output:
+        if validation_results:
             headers = ['Ground Truth', 'Prediction', 'LER', 'WER', 'Prediction (LM-corrected)', 'LER', 'WER']
             print(tabulate(validation_results, headers=headers))
         wer_values, wer_mean = wers(originals, results)
