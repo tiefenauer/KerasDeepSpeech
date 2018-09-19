@@ -13,6 +13,12 @@ from util.rnn_util import decode
 from utils import save_model
 
 
+def decode_batch_keras(y_pred, input_length, greedy=True):
+    # https://www.dlology.com/blog/how-to-train-a-keras-model-to-recognize-variable-length-text/
+    decoded_int = K.get_value(K.ctc_decode(y_pred=y_pred, input_length=input_length, greedy=greedy)[0][0])
+    return [decode(int_seq) for int_seq in decoded_int]
+
+
 class ReportCallback(callbacks.Callback):
     def __init__(self, data_valid, model, run_id, save_progress=True, early_stopping=False, shuffle_data=True,
                  force_output=False):
@@ -61,11 +67,22 @@ class ReportCallback(callbacks.Callback):
 
         for _ in tqdm(range(len(self.data_valid))):
             batch_inputs, _ = next(self.data_valid)
-            decoded_res = decode_batch(self.test_func, batch_inputs['the_input'])
+            # decoded_res = decode_batch(self.test_func, batch_inputs['the_input'])
+            y_pred_0 = batch_inputs['the_input']
+            input_length_0 = batch_inputs['input_length']
+            decoded_res_0 = decode_batch_keras(y_pred_0, input_length_0)
+
+            y_pred_1 = self.test_func([batch_inputs['the_input']])[0]
+            input_length_1 = batch_inputs['label_length']
+            decoded_res_1 = decode_batch_keras(y_pred_1, input_length_1)
+
+            y_pred_3 = self.test_func([batch_inputs['the_input']])[0]
+            input_length_3 = batch_inputs['input_length']
+            decoded_res_3 = decode_batch_keras(y_pred_3, input_length_3)
 
             for j in range(0, self.data_valid.batch_size):
                 ground_truth = batch_inputs['source_str'][j]
-                pred = decoded_res[j]
+                pred = decoded_res_1[j]
                 pred_lm = correction(pred)
 
                 wer_decoded = wer(ground_truth, pred)

@@ -38,7 +38,7 @@ def decode(tokens):
 
 
 def decode_token(ind):
-    return '' if ind == len(CHAR_TOKENS) else CHAR_TOKENS[ind]
+    return '' if ind in [-1, len(CHAR_TOKENS)] else CHAR_TOKENS[ind]
 
 
 def sparse_tuple_from(sequences, dtype=np.int32):
