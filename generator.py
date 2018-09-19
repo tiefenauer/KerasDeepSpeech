@@ -109,8 +109,10 @@ class CSVBatchGenerator(BatchGenerator):
         features = []
         for i in index_array:
             if i < len(self.wav_features) and self.wav_features[i] is not None:
+                print('cache hit!')
                 features.append(self.wav_features[i])
             else:
+                print('cache miss!')
                 feature = extract_mfcc(self.wav_files[i])
                 self.wav_features[i] = feature
                 features.append(feature)
