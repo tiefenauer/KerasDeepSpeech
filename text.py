@@ -17,6 +17,7 @@ def wer(original, result):
     # Therefore we split the strings into words first:
     original = original.split()
     result = result.split()
+    print(f'original: {original}, result: {result}')
     return levenshtein(original, result) / float(len(original))
 
 def wers(originals, results):

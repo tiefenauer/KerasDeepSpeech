@@ -15,7 +15,7 @@ from utils import save_model
 
 class ReportCallback(callbacks.Callback):
     def __init__(self, data_valid, model, run_id, save_progress=True, early_stopping=True, shuffle_data=True,
-                 force_output=False):
+                 force_output=True):
         """
         Will calculate WER and LER at epoch end and print out infered transcriptions from validation set using the 
         current model and weights
