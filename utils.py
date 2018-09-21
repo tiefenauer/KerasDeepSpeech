@@ -30,13 +30,13 @@ def save_trimmed_model(model, name):
     return
 
 
-def save_model(model, target_dir):
+def save_model(model, target_dir, base_name='model'):
     if not exists(target_dir):
         makedirs(target_dir)
 
-    model_path = join(target_dir, 'model.h5')
-    weights_path = join(target_dir, 'weights.h5')
-    json_path = join(target_dir, 'model.json')
+    model_path = join(target_dir, f'{base_name}.h5')
+    json_path = join(target_dir, f'{base_name}.json')
+    weights_path = join(target_dir, f'{base_name}_weights.h5')
     print(f'Saving model in {model_path}, weights in {weights_path} and architecture in {json_path}')
 
     model.save(model_path)

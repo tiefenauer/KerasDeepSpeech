@@ -49,6 +49,8 @@ parser.add_argument('--learning_rate', type=float, default=0.01, help='the learn
 parser.add_argument('--sort_samples', type=bool, default=True,
                     help='sort utterances by their length in the first epoch')
 parser.add_argument('--epochs', type=int, default=20, help='Number of epochs to train the model')
+parser.add_argument('--minutes', type=int, default=None,
+                    help='Number of minutes of training data to use. Default: None (=all)')
 parser.add_argument('--batch_size', type=int, default=16, help='batch_size used to train the model')
 parser.add_argument('--gpu', type=str, nargs='?', default='2', help='(optional) GPU(s) to use for training. Default: 2')
 args = parser.parse_args()
@@ -63,7 +65,7 @@ def main():
     opt = SGD(lr=args.learning_rate, decay=1e-6, momentum=0.9, nesterov=True, clipnorm=5)
     model.compile(optimizer=opt, loss=ctc)
 
-    train_model(model, target_dir)
+    train_model(model, target_dir, args.minutes)
 
 
 def setup():
@@ -105,17 +107,15 @@ def create_model(target_dir):
         print('Creating new model')
         # model = deep_speech_dropout(input_dim=26, fc_size=args.fc_size, rnn_size=args.rnn_size, output_dim=29)
         model = ds1(input_dim=26, fc_size=args.fc_size, rnn_size=args.rnn_size, output_dim=29)
-        save_model(model, target_dir)
-        print(f'model saved in {target_dir}')
 
     model.summary()
     return model
 
 
-def train_model(model, target_dir):
+def train_model(model, target_dir, num_minutes=None):
     print("Creating data batch generators")
     data_train = CSVBatchGenerator(args.train_files, shuffle=False, n_batches=args.train_batches,
-                                   batch_size=args.batch_size)
+                                   batch_size=args.batch_size, num_minutes=num_minutes)
     data_valid = CSVBatchGenerator(args.valid_files, shuffle=True, n_batches=args.valid_batches,
                                    batch_size=args.batch_size)
 
@@ -127,7 +127,7 @@ def train_model(model, target_dir):
         tb_cb = TensorBoard(log_dir=join(target_dir, 'tensorboard'), write_graph=False, write_images=True)
         cb_list.append(tb_cb)
 
-    report_cb = ReportCallback(data_valid, model, n_epochs=args.epochs, target_dir=target_dir)
+    report_cb = ReportCallback(data_valid, model, num_epochs=args.epochs, target_dir=target_dir)
     cb_list.append(report_cb)
 
     model.fit_generator(generator=data_train,

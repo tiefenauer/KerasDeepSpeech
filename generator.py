@@ -1,5 +1,6 @@
 import sys
 from abc import abstractmethod
+from datetime import timedelta
 from genericpath import isfile
 from os.path import join
 
@@ -21,7 +22,7 @@ class BatchGenerator(object):
         self.cur_index = 0
 
     def __len__(self):
-        return self.n // self.batch_size # number of batches
+        return self.n // self.batch_size  # number of batches
 
     def __iter__(self):
         return self
@@ -88,13 +89,27 @@ class BatchGenerator(object):
 
 class CSVBatchGenerator(BatchGenerator):
 
-    def __init__(self, csv_path, shuffle=False, n_batches=None, batch_size=16):
+    def __init__(self, csv_path, shuffle=False, n_batches=None, batch_size=16, num_minutes=None):
         df = read_data_from_csv(csv_path=csv_path, sort=True)
         if n_batches:
             df = df.head(n_batches * batch_size)
+        elif num_minutes:
+            # truncate dataset to first {num_minutes} minutes of audio data
+            max_audio_length = sum(df['wav_length'])
+            if num_minutes * 60 > max_audio_length:
+                print(f"""WARNING: {num_minutes} minutes is longer than total length of the dataset ({timedelta(seconds=max_audio_length)})!
+                Training will be done on the whole dataset.""")
+            else:
+                clip_ix = 0
+                while sum(df['wav_length'][:clip_ix]) < num_minutes * 60 and clip_ix < len(df.index):
+                    clip_ix += 1
+                df = df.head(clip_ix)
+                audio_length = sum(df['wav_length'])
+                print(f'clipped to first {clip_ix} samples ({timedelta(seconds=audio_length)} minutes).')
 
         self.wav_files = df['wav_filename'].tolist()
         self.wav_sizes = df['wav_filesize'].tolist()
+        self.wav_lengths = df['wav_length'].tolist()
         self.transcripts = df['transcript'].tolist()
 
         super().__init__(n=len(df.index), batch_size=batch_size, shuffle=shuffle)

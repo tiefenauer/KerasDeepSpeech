@@ -22,8 +22,8 @@ def decode_batch_keras(y_pred, input_length, greedy=True):
 
 
 class ReportCallback(callbacks.Callback):
-    def __init__(self, data_valid, model, target_dir, n_epochs, save_progress=True, early_stopping=False,
-                 shuffle_data=True, force_output=False):
+    def __init__(self, data_valid, model, target_dir, num_epochs, num_minutes=None, save_progress=True,
+                 early_stopping=False, shuffle_data=True, force_output=False):
         """
         Will calculate WER and LER at epoch end and print out infered transcriptions from validation set using the 
         current model and weights
@@ -39,7 +39,8 @@ class ReportCallback(callbacks.Callback):
         self.data_valid = data_valid
         self.model = model
         self.target_dir = target_dir
-        self.n_epochs = n_epochs
+        self.num_epochs = num_epochs
+        self.num_minutes = num_minutes
         self.save_progress = save_progress
         self.early_stopping = early_stopping
         self.shuffle_data = shuffle_data
@@ -53,7 +54,10 @@ class ReportCallback(callbacks.Callback):
         self.test_func = K.function([input_data, K.learning_phase()], [y_pred])
 
         # WER/LER history
-        self.df_history = pd.DataFrame(index=np.arange(n_epochs), columns=['WER', 'LER', 'ler_raw'])
+        self.df_history = pd.DataFrame(index=np.arange(num_epochs), columns=['WER', 'LER', 'ler_raw'])
+
+        # base name for files that will be written to target directory
+        self.base_name = 'model' + (f'{self.num_minutes}_min' if self.num_minutes else '')
 
     def validate_epoch(self, epoch):
         K.set_learning_phase(0)
@@ -122,7 +126,7 @@ class ReportCallback(callbacks.Callback):
     def finish(self):
         self.df_history.index.name = 'epoch'
         self.df_history.index += 1  # epochs start at 1
-        self.df_history.to_csv(join(self.target_dir, 'wer_ler.csv'))
+        self.df_history.to_csv(join(self.target_dir, f'{self.base_name}.csv'))
         print("########################################################")
         print("Finished!")
         print("########################################################")
@@ -130,7 +134,7 @@ class ReportCallback(callbacks.Callback):
     def on_epoch_end(self, epoch, logs=None):
         self.validate_epoch(epoch)
 
-        if epoch == self.n_epochs - 1:
+        if epoch == self.num_epochs - 1:
             self.finish()
 
         # early stopping if VAL WER worse 4 times in a row
@@ -143,7 +147,7 @@ class ReportCallback(callbacks.Callback):
         # save checkpoint if last LER or last WER was better than all previous values
         if self.save_progress and self.new_benchmark():
             print(f'New WER or LER benchmark!')
-            save_model(self.model, target_dir=self.target_dir)
+            save_model(self.model, target_dir=self.target_dir, base_name=self.base_name)
 
     def new_benchmark(self):
         """
