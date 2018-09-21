@@ -45,8 +45,7 @@ class ReportCallback(callbacks.Callback):
 
         y_pred = model.get_layer('ctc').input[0]
         input_data = model.get_layer('the_input').input
-        test_func = K.function([input_data, K.learning_phase()], [y_pred])
-        self.test_func = test_func
+        self.test_func = K.function([input_data, K.learning_phase()], [y_pred])
 
         # WER/LER history
         self.mean_wer_log = []
@@ -69,14 +68,17 @@ class ReportCallback(callbacks.Callback):
         for _ in tqdm(range(len(self.data_valid))):
             batch_inputs, _ = next(self.data_valid)
             # decoded_res = decode_batch(self.test_func, batch_inputs['the_input'])
+            # print(' '.join(decoded_res))
             # y_pred_0 = batch_inputs['the_input']
             # input_length_0 = batch_inputs['input_length']
             # decoded_res_0 = decode_batch_keras(y_pred_0, input_length_0)
 
-            y_pred_1 = self.test_func([batch_inputs['the_input']])[0]
-            input_length_1 = batch_inputs['input_length']
-            # decoded_res = decode_batch_keras(y_pred_1, input_length_1, greedy=True)
-            decoded_res = decode_batch_keras(y_pred_1, input_length_1, greedy=False)
+            y_pred = self.test_func([batch_inputs['the_input']])[0]
+            input_length = batch_inputs['input_length']
+            # decoded_res = decode_batch_keras(y_pred, input_length, greedy=True)
+            # print(' '.join(decoded_res))
+            decoded_res = decode_batch_keras(y_pred, input_length, greedy=False)
+            print(' '.join(decoded_res))
 
             # y_pred_3 = self.test_func([batch_inputs['the_input']])[0]
             # input_length_3 = batch_inputs['input_length']
