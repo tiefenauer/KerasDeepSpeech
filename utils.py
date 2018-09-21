@@ -1,5 +1,7 @@
 import resource
 import types
+from os import makedirs
+from os.path import exists, join
 
 import keras
 import keras.backend as K
@@ -28,22 +30,19 @@ def save_trimmed_model(model, name):
     return
 
 
-def save_model(model, name):
-    if name:
-        jsonfilename = str(name) + "/model.json"
-        weightsfilename = str(name) + "/model.h5"
+def save_model(model, target_dir):
+    if not exists(target_dir):
+        makedirs(target_dir)
 
-        # # serialize model to JSON
-        with open(jsonfilename, "w") as json_file:
-            json_file.write(model.to_json())
+    model_path = join(target_dir, 'model.h5')
+    weights_path = join(target_dir, 'weights.h5')
+    json_path = join(target_dir, 'model.json')
+    print(f'Saving model in {model_path}, weights in {weights_path} and architecture in {json_path}')
 
-        print("Saving model at:", jsonfilename, weightsfilename)
-        model.save_weights(weightsfilename)
-
-        # save model as combined in single file - contrains arch/weights/config/state
-        model.save(str(name) + "/cmodel.h5")
-
-    return
+    model.save(model_path)
+    model.save_weights(weights_path)
+    with open(json_path, "w") as json_file:
+        json_file.write(model.to_json())
 
 
 def load_model_checkpoint(root_path):

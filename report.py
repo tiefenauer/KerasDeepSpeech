@@ -1,9 +1,10 @@
 import itertools
 import sys
 from os import makedirs
-from os.path import join, isdir
+from os.path import isdir, join
 
 import keras.backend as K
+import pandas as pd
 from keras import callbacks
 from tabulate import tabulate
 from tqdm import tqdm
@@ -21,14 +22,14 @@ def decode_batch_keras(y_pred, input_length, greedy=True):
 
 
 class ReportCallback(callbacks.Callback):
-    def __init__(self, data_valid, model, run_id, save_progress=True, early_stopping=False, shuffle_data=True,
-                 force_output=False):
+    def __init__(self, data_valid, model, target_dir, n_epochs, save_progress=True, early_stopping=False,
+                 shuffle_data=True, force_output=False):
         """
         Will calculate WER and LER at epoch end and print out infered transcriptions from validation set using the 
         current model and weights
         :param data_valid: validation data
         :param model: compiled model
-        :param run_id: string that identifies the current run
+        :param target_dir: string that identifies the current run
         :param save_progress:
         :param early_stopping: 
         :param shuffle_data: 
@@ -37,20 +38,22 @@ class ReportCallback(callbacks.Callback):
         super().__init__()
         self.data_valid = data_valid
         self.model = model
-        self.run_id = run_id
+        self.target_dir = target_dir
+        self.n_epochs = n_epochs
         self.save_progress = save_progress
         self.early_stopping = early_stopping
         self.shuffle_data = shuffle_data
         self.force_output = force_output
+
+        if not isdir(self.target_dir):
+            makedirs(self.target_dir)
 
         y_pred = model.get_layer('ctc').input[0]
         input_data = model.get_layer('the_input').input
         self.test_func = K.function([input_data, K.learning_phase()], [y_pred])
 
         # WER/LER history
-        self.mean_wer_log = []
-        self.mean_ler_log = []
-        self.norm_mean_ler_log = []
+        self.df_history = pd.DataFrame(index=np.arange(n_epochs), columns=['WER', 'LER', 'ler_raw'])
 
     def validate_epoch(self, epoch):
         K.set_learning_phase(0)
@@ -78,7 +81,7 @@ class ReportCallback(callbacks.Callback):
             # decoded_res = decode_batch_keras(y_pred, input_length, greedy=True)
             # print(' '.join(decoded_res))
             decoded_res = decode_batch_keras(y_pred, input_length, greedy=False)
-            print(' '.join(decoded_res))
+            # print(' '.join(decoded_res))
 
             # y_pred_3 = self.test_func([batch_inputs['the_input']])[0]
             # input_length_3 = batch_inputs['input_length']
@@ -103,42 +106,66 @@ class ReportCallback(callbacks.Callback):
             headers = ['Ground Truth', 'Prediction', 'LER', 'WER', 'Prediction (LM-corrected)', 'LER', 'WER']
             print(tabulate(validation_results, headers=headers, floatfmt=".4f"))
         wer_values, wer_mean = wers(originals, results)
-        ler_values, ler_mean, ler_values_norm, ler_values_norm_mean = lers(originals, results)
-        print("########################################################")
-        print("Validation results: WER & LER (using LM)")
-        print("WER average is   :", wer_mean)
-        print("LER average is   :", ler_mean)
-        print("normalised LER is:", ler_values_norm_mean)
-        print("########################################################")
+        ler_values, ler_mean, ler_raw, ler_raw_mean = lers(originals, results)
+        print('--------------------------------------------------------')
+        print(f'Validation results after epoch {epoch+1}: WER & LER (using LM)')
+        print('--------------------------------------------------------')
+        print(f'WER average      : {wer_mean}')
+        print(f'LER average      : {ler_mean}')
+        print(f'LER average (raw): {ler_raw_mean}')
+        print('--------------------------------------------------------')
 
-        self.mean_wer_log.append(wer_mean)
-        self.mean_ler_log.append(ler_mean)
-        self.norm_mean_ler_log.append(ler_values_norm_mean)
+        self.df_history.loc[epoch] = [wer_mean, ler_mean, ler_raw_mean]
 
         K.set_learning_phase(1)
+
+    def finish(self):
+        self.df_history.index.name = 'epoch'
+        self.df_history.index += 1  # epochs start at 1
+        self.df_history.to_csv(join(self.target_dir, 'wer_ler.csv'))
+        print("########################################################")
+        print("Finished!")
+        print("########################################################")
 
     def on_epoch_end(self, epoch, logs=None):
         self.validate_epoch(epoch)
 
+        if epoch == self.n_epochs - 1:
+            self.finish()
+
         # early stopping if VAL WER worse 4 times in a row
-        if self.early_stopping and is_early_stopping(self.mean_wer_log):
+        if self.early_stopping and self.stop_early():
             print("EARLY STOPPING")
-            print("Mean WER   :", self.mean_wer_log)
-            print("Mean LER   :", self.mean_ler_log)
-            print("NormMeanLER:", self.norm_mean_ler_log)
+            self.finish()
 
             sys.exit()
 
         # save checkpoint if last LER or last WER was better than all previous values
-        if self.save_progress and (new_benchmark(self.mean_ler_log) or new_benchmark(self.mean_wer_log)):
-            save_dir = join('checkpoints', 'epoch', f'LER-WER-best-{self.run_id}')
-            print(f'New WER or LER benchmark! Saving model and weights at {save_dir}')
-            if not isdir(save_dir):
-                makedirs(save_dir)
-            try:
-                save_model(self.model, name=save_dir)
-            except Exception as e:
-                print("couldn't save error:", e)
+        if self.save_progress and self.new_benchmark():
+            print(f'New WER or LER benchmark!')
+            save_model(self.model, target_dir=self.target_dir)
+
+    def new_benchmark(self):
+        """
+        We have a new benchmark if the last value in a sequence of values is the smallest
+        """
+        wers = self.df_history['WER'].dropna().values
+        lers = self.df_history['LER'].dropna().values
+        return is_last_value_smallest(wers) or is_last_value_smallest(lers)
+
+    def stop_early(self):
+        """
+        stop early if last WER is bigger than all 4 previous WERs
+        """
+        wers = self.df_history['WER']
+        if len(wers) <= 4:
+            return False
+
+        last = wers[-1]
+        rest = wers[-5:-1]
+        print(f'{last} vs {rest}')
+
+        return all(val <= last for val in rest)
 
 
 def decode_batch(test_func, word_batch):
@@ -154,23 +181,7 @@ def decode_batch(test_func, word_batch):
     return ret
 
 
-def is_early_stopping(wer_logs):
-    """
-    stop early if last WER is bigger than all 4 previous WERs
-    :param wer_logs: log-scaled WER values
-    :return:
-    """
-    if len(wer_logs) <= 4:
-        return False
-
-    last = wer_logs[-1]
-    rest = wer_logs[-5:-1]
-    print(f'{last} vs {rest}')
-
-    return all(i <= last for i in rest)
-
-
-def new_benchmark(values):
+def is_last_value_smallest(values):
     """
     We have a new benchmark if the last value in a sequence of values is the smallest
     :param values: sequence of values

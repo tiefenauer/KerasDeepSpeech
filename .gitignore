@@ -20,3 +20,4 @@ data/*
 !data-recorder.py
 /checkpoints/
 /tensorboard/
+/run-train.sh

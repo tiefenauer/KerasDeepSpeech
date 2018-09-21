@@ -35,9 +35,9 @@ def wers(ground_truths, predictions):
 def lers(ground_truths, predictions):
     assert len(ground_truths) > 0, f'ERROR assert len(ground_truth) > 0: looks like data is missing!'
     assert len(ground_truths) == len(predictions), f'ERROR: not same number of ground truths and predictions!'
-    rates = [levenshtein(ground_truth, prediction) for (ground_truth, prediction) in zip(ground_truths, predictions)]
-    norm_rates = [ler(ground_truth, prediction) for (ground_truth, prediction) in zip(ground_truths, predictions)]
-    return rates, np.mean(rates), norm_rates, np.mean(norm_rates)
+    lers_raw = [levenshtein(ground_truth, prediction) for (ground_truth, prediction) in zip(ground_truths, predictions)]
+    lers_norm = [ler(ground_truth, prediction) for (ground_truth, prediction) in zip(ground_truths, predictions)]
+    return lers_norm, np.mean(lers_norm), lers_raw, np.mean(lers_raw)
 
 
 def get_LM():

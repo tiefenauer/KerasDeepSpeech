@@ -115,9 +115,9 @@ def read_data_from_csv(csv_path, sort=True, create_word_list=False):
         print(f'ERROR: CSV file {csv_path} does not exist!', file=sys.stderr)
         exit(0)
 
-    print(f'Reading samples from {csv_path}...')
+    print(f'Reading samples from {csv_path}...', end='')
     df = pd.read_csv(csv_path, sep=',', encoding='utf-8')
-    print(f'...done! Read {len(df.index)} samples.')
+    print(f'done! ({len(df.index)} samples)')
 
     if create_word_list:
         df['transcript'].to_csv(join('lm', 'df_all_word_list.csv'), header=False, index=False)

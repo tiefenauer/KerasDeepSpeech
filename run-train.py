@@ -27,14 +27,15 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Prevent pool_allocator message
 #######################################################
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--tensorboard', type=bool, default=True, help='True/False to use tensorboard')
-parser.add_argument('--memcheck', type=bool, default=False, help='print out memory details for each epoch')
-parser.add_argument('--name', type=str, default='',
-                    help='name of run, used to set checkpoint save name. Default uses timestamp')
+parser.add_argument('--target_dir', type=str, required=True, help='root directory for all output')
+parser.add_argument('--run_id', type=str, default='',
+                    help='id of run, used to set checkpoint save name. Default uses timestamp')
 parser.add_argument('--train_files', type=str, default='',
                     help='list of all train files, seperated by a comma if multiple')
 parser.add_argument('--valid_files', type=str, default='',
                     help='list of all validation files, seperate by a comma if multiple')
+parser.add_argument('--tensorboard', type=bool, default=True, help='True/False to use tensorboard')
+parser.add_argument('--memcheck', type=bool, default=False, help='print out memory details for each epoch')
 parser.add_argument('--train_batches', type=int, default=0,
                     help='number of batches to use for training in each epoch. Use 0 for automatic')
 parser.add_argument('--valid_batches', type=int, default=0,
@@ -54,24 +55,24 @@ args = parser.parse_args()
 
 
 def main():
-    output_dir = setup()
+    target_dir = setup()
     print(create_args_str(args))
 
-    model = create_model(output_dir)
+    model = create_model(target_dir)
     # opt = Adam(lr=args.learning_rate, beta_1=0.9, beta_2=0.999, epsilon=1e-8, clipnorm=5)
     opt = SGD(lr=args.learning_rate, decay=1e-6, momentum=0.9, nesterov=True, clipnorm=5)
     model.compile(optimizer=opt, loss=ctc)
 
-    train_model(model)
+    train_model(model, target_dir)
 
 
 def setup():
-    if args.name == "":
-        args.name = 'DS' + datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')
+    if not args.run_id:
+        args.run_id = 'DS_' + datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')
 
-    output_dir = join('checkpoints', 'results', f'model_{args.name}')
-    if not isdir(output_dir):
-        makedirs(output_dir)
+    target_dir = join(args.target_dir, args.run_id)
+    if not isdir(target_dir):
+        makedirs(target_dir)
 
     # log_file_path = join(output_dir, 'train.log')
     # redirect_to_file(log_file_path)
@@ -90,10 +91,10 @@ def setup():
     session = tf.Session(config=config)
     K.set_session(session)
 
-    return output_dir
+    return target_dir
 
 
-def create_model(output_dir):
+def create_model(target_dir):
     if args.model_path:
         print(f'Loading model from {args.model_path}')
         if not isdir(args.model_path):
@@ -104,14 +105,14 @@ def create_model(output_dir):
         print('Creating new model')
         # model = deep_speech_dropout(input_dim=26, fc_size=args.fc_size, rnn_size=args.rnn_size, output_dim=29)
         model = ds1(input_dim=26, fc_size=args.fc_size, rnn_size=args.rnn_size, output_dim=29)
-        save_model(model, output_dir)
-        print(f'model saved in {output_dir}')
+        save_model(model, target_dir)
+        print(f'model saved in {target_dir}')
 
     model.summary()
     return model
 
 
-def train_model(model):
+def train_model(model, target_dir):
     print("Creating data batch generators")
     data_train = CSVBatchGenerator(args.train_files, shuffle=False, n_batches=args.train_batches,
                                    batch_size=args.batch_size)
@@ -123,10 +124,10 @@ def train_model(model):
         cb_list.append(MemoryCallback())
 
     if args.tensorboard:
-        tb_cb = TensorBoard(log_dir=join('tensorboard', args.name), write_graph=False, write_images=True)
+        tb_cb = TensorBoard(log_dir=join(target_dir, 'tensorboard'), write_graph=False, write_images=True)
         cb_list.append(tb_cb)
 
-    report_cb = ReportCallback(data_valid, model, args.name)
+    report_cb = ReportCallback(data_valid, model, n_epochs=args.epochs, target_dir=target_dir)
     cb_list.append(report_cb)
 
     model.fit_generator(generator=data_train,
@@ -134,10 +135,6 @@ def train_model(model):
                         steps_per_epoch=len(data_train),
                         validation_steps=len(data_valid),
                         epochs=args.epochs, callbacks=cb_list, workers=1)
-
-    print("Mean WER   :", report_cb.mean_wer_log)
-    print("Mean LER   :", report_cb.mean_ler_log)
-    print("NormMeanLER:", report_cb.norm_mean_ler_log)
 
     K.clear_session()
 
