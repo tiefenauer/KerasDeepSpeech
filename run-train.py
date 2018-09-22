@@ -20,7 +20,7 @@ from generator import CSVBatchGenerator
 from model import *
 from report import ReportCallback
 from util.log_util import create_args_str
-from utils import load_model_checkpoint, save_model, MemoryCallback
+from utils import load_model_checkpoint, MemoryCallback
 
 #######################################################
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Prevent pool_allocator message
@@ -127,7 +127,8 @@ def train_model(model, target_dir, num_minutes=None):
         tb_cb = TensorBoard(log_dir=join(target_dir, 'tensorboard'), write_graph=False, write_images=True)
         cb_list.append(tb_cb)
 
-    report_cb = ReportCallback(data_valid, model, num_epochs=args.epochs, target_dir=target_dir)
+    report_cb = ReportCallback(data_valid, model, num_minutes=num_minutes, num_epochs=args.epochs,
+                               target_dir=target_dir)
     cb_list.append(report_cb)
 
     model.fit_generator(generator=data_train,

@@ -57,7 +57,8 @@ class ReportCallback(callbacks.Callback):
         self.df_history = pd.DataFrame(index=np.arange(num_epochs), columns=['WER', 'LER', 'ler_raw'])
 
         # base name for files that will be written to target directory
-        self.base_name = 'model' + (f'{self.num_minutes}_min' if self.num_minutes else '')
+        self.base_name = 'model' + (f'_{self.num_minutes}_min' if self.num_minutes else '')
+        print(f'base name for result files: {self.base_name}')
 
     def validate_epoch(self, epoch):
         K.set_learning_phase(0)
@@ -126,9 +127,11 @@ class ReportCallback(callbacks.Callback):
     def finish(self):
         self.df_history.index.name = 'epoch'
         self.df_history.index += 1  # epochs start at 1
-        self.df_history.to_csv(join(self.target_dir, f'{self.base_name}.csv'))
+        csv_path = join(self.target_dir, f'{self.base_name}.csv')
+        self.df_history.to_csv(csv_path)
         print("########################################################")
         print("Finished!")
+        print(f'saved validation results to {csv_path}')
         print("########################################################")
 
     def on_epoch_end(self, epoch, logs=None):

@@ -25,7 +25,11 @@ case $key in
     shift # past argument
     shift # past value
     ;;
-
+    -r|--run_id)
+    run_id="$2"
+    shift # past argument
+    shift # past value
+    ;;
     *)    # unknown option
     POSITIONAL+=("$1") # save it in an array for later
     shift # past argument
@@ -42,6 +46,7 @@ for minutes in 1 10 100 1000
 do
     echo "training on $minutes minutes"
     bash ./run-train.sh \
+            --run_id $run_id \
             --train_files $train_files \
             --valid_files $valid_files \
             --target_dir $target_dir \

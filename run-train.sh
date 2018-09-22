@@ -26,6 +26,11 @@ case $key in
     shift # past argument
     shift # past value
     ;;
+    -r|--run_id)
+    run_id="$2"
+    shift # past argument
+    shift # past value
+    ;;
     *)    # unknown option
     POSITIONAL+=("$1") # save it in an array for later
     shift # past argument
@@ -41,7 +46,8 @@ echo minutes      = "${minutes}"
 
 
 python3 run-train.py \
+    --run_id $run_id \
     --train_files $train_files \
     --valid_files $valid_files \
     --target_dir $target_dir \
-    --minutes $minutes
+    --minutes $minutes 2>&1 | tee $target_dir/$run_id/$run_id.log
