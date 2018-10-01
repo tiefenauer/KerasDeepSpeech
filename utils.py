@@ -5,6 +5,7 @@ from os.path import exists, join
 
 import keras
 import keras.backend as K
+from keras.engine.saving import load_model
 from keras.models import model_from_json
 from pympler import muppy, summary, tracker
 from pympler.web import start_in_background
@@ -51,17 +52,27 @@ def load_model_checkpoint(root_path):
     get_custom_objects().update({"clipped_relu": clipped_relu})
     get_custom_objects().update({"selu": selu})
 
-    model_json = root_path + "model.json"  # architecture
-    model_weights = root_path + "model.h5"
-
-    with open(model_json, 'r') as json_file:
-        loaded_model_json = json_file.read()
-
+    # prefer single file over architecture + weight
+    model_h5 = join(root_path, 'model.h5')
+    if exists(model_h5):
+        print(f'loading model from {model_h5}')
         K.set_learning_phase(1)
-        loaded_model = model_from_json(loaded_model_json)
-        loaded_model.load_weights(model_weights)
+        return load_model(model_h5)
 
-    return loaded_model
+    model_arch = join(root_path, "model.json")
+    model_weights = join(root_path, "model_weights.h5")
+
+    if exists(model_arch) and exists(model_weights):
+        with open(model_arch, 'r') as json_file:
+            print(f'loading model architecture from {model_arch} and weights from {model_weights}')
+            loaded_model_json = json_file.read()
+
+            K.set_learning_phase(1)
+            loaded_model = model_from_json(loaded_model_json)
+            loaded_model.load_weights(model_weights)
+            return loaded_model
+
+    return None
 
 
 memlist = []

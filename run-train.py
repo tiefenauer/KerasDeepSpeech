@@ -34,6 +34,8 @@ parser.add_argument('--train_files', type=str, default='',
                     help='list of all train files, seperated by a comma if multiple')
 parser.add_argument('--valid_files', type=str, default='',
                     help='list of all validation files, seperate by a comma if multiple')
+parser.add_argument('--decoder', type=str, default='beamsearch',
+                    help='decoder to use (\'beamsearch\', \'bestpath\'). Default: beamsearch')
 parser.add_argument('--tensorboard', type=bool, default=True, help='True/False to use tensorboard')
 parser.add_argument('--memcheck', type=bool, default=False, help='print out memory details for each epoch')
 parser.add_argument('--train_batches', type=int, default=0,
@@ -61,9 +63,6 @@ def main():
     print(create_args_str(args))
 
     model = create_model(target_dir)
-    # opt = Adam(lr=args.learning_rate, beta_1=0.9, beta_2=0.999, epsilon=1e-8, clipnorm=5)
-    opt = SGD(lr=args.learning_rate, decay=1e-6, momentum=0.9, nesterov=True, clipnorm=5)
-    model.compile(optimizer=opt, loss=ctc)
 
     train_model(model, target_dir, args.minutes)
 
@@ -98,15 +97,18 @@ def setup():
 
 def create_model(target_dir):
     if args.model_path:
-        print(f'Loading model from {args.model_path}')
+        print(f'trying to load model from {target_dir}')
         if not isdir(args.model_path):
-            print(f'ERROR: directory {args.model_path} does not exist!', file=sys.stderr)
+            print(f'ERROR: directory {target_dir} does not exist!', file=sys.stderr)
             exit(0)
-        model = load_model_checkpoint(args.model_path)
+        model = load_model_checkpoint(target_dir)
     else:
         print('Creating new model')
         # model = deep_speech_dropout(input_dim=26, fc_size=args.fc_size, rnn_size=args.rnn_size, output_dim=29)
         model = ds1(input_dim=26, fc_size=args.fc_size, rnn_size=args.rnn_size, output_dim=29)
+        # opt = Adam(lr=args.learning_rate, beta_1=0.9, beta_2=0.999, epsilon=1e-8, clipnorm=5)
+        opt = SGD(lr=args.learning_rate, decay=1e-6, momentum=0.9, nesterov=True, clipnorm=5)
+        model.compile(optimizer=opt, loss=ctc)
 
     model.summary()
     return model
@@ -128,7 +130,7 @@ def train_model(model, target_dir, num_minutes=None):
         cb_list.append(tb_cb)
 
     report_cb = ReportCallback(data_valid, model, num_minutes=num_minutes, num_epochs=args.epochs,
-                               target_dir=target_dir)
+                               target_dir=target_dir, decoder=args.decoder)
     cb_list.append(report_cb)
 
     model.fit_generator(generator=data_train,

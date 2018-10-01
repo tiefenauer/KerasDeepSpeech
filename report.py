@@ -23,7 +23,7 @@ def decode_batch_keras(y_pred, input_length, greedy=True):
 
 class ReportCallback(callbacks.Callback):
     def __init__(self, data_valid, model, target_dir, num_epochs, num_minutes=None, save_progress=True,
-                 early_stopping=False, shuffle_data=True, force_output=False):
+                 early_stopping=False, shuffle_data=True, force_output=False, decoder='beamsearch'):
         """
         Will calculate WER and LER at epoch end and print out infered transcriptions from validation set using the 
         current model and weights
@@ -33,7 +33,8 @@ class ReportCallback(callbacks.Callback):
         :param save_progress:
         :param early_stopping: 
         :param shuffle_data: 
-        :param force_output: 
+        :param force_output:
+        :param decoder: decoder to use ('beamsearch' or 'bestpath')
         """
         super().__init__()
         self.data_valid = data_valid
@@ -45,6 +46,7 @@ class ReportCallback(callbacks.Callback):
         self.early_stopping = early_stopping
         self.shuffle_data = shuffle_data
         self.force_output = force_output
+        self.decoder = decoder
 
         if not isdir(self.target_dir):
             makedirs(self.target_dir)
@@ -85,7 +87,13 @@ class ReportCallback(callbacks.Callback):
             input_length = batch_inputs['input_length']
             # decoded_res = decode_batch_keras(y_pred, input_length, greedy=True)
             # print(' '.join(decoded_res))
-            decoded_res = decode_batch_keras(y_pred, input_length, greedy=False)
+            if self.decoder == 'beamsearch':
+                decoded_res = decode_batch_keras(y_pred, input_length, greedy=True)
+            elif self.decoder == 'bestpath':
+                decoded_res = decode_batch_keras(y_pred, input_length, greedy=False)
+            else:
+                decoded_res = decode_batch(self.test_func, batch_inputs['the_input'])
+
             # print(' '.join(decoded_res))
 
             # y_pred_3 = self.test_func([batch_inputs['the_input']])[0]
