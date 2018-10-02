@@ -6,6 +6,7 @@ where:
     -t <path>    use CSV file at <path> containing the corpus files for training
     -v <path>    use CSV file at <path> containing the corpus files for evaluation
     -d <path>    store results at <path>
+    -g <int>     GPU to use
 
 Create data to plot a learning curve by running a simplified version of the DeepSpeech-BRNN along the following dimensions:
 
@@ -21,6 +22,7 @@ a unique run-id from which the value of each dimension can be derived.
 train_files='/media/all/D1/readylingua-en/readylingua-en-train.csv'
 valid_files='/media/all/D1/readylingua-en/readylingua-en-dev.csv'
 target_dir='/home/daniel_tiefenauer/learning_curve_0'
+gpu='2'
 
 while getopts ':hs:' option; do
   case "$option" in
@@ -32,6 +34,8 @@ while getopts ':hs:' option; do
     v) valid_files=$OPTARG
        ;;
     d) target_dir=$OPTARG
+       ;;
+    g) gpu=$OPTARG
        ;;
 #    :) printf "missing argument for -%s\n" "$OPTARG" >&2
 #       echo "$usage" >&2
@@ -48,6 +52,7 @@ shift $((OPTIND - 1))
 echo train_files  = "${train_files}"
 echo valid_files  = "${valid_files}"
 echo target_dir   = "${target_dir}"
+echo gpu          = "${gpu}"
 
 # time dimension
 for minutes in 1 10 100 1000
@@ -71,7 +76,8 @@ do
                 --target_dir ${target_dir} \
                 --run_id ${run_id} \
                 --minutes ${minutes} \
-                --decoder ${decoder}\
+                --decoder ${decoder} \
+                --gpu ${gpu} \
                 --train_files ${train_files} \
                 --valid_files ${valid_files}
 
