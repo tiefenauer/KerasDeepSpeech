@@ -24,30 +24,42 @@ valid_files='/media/all/D1/readylingua-en/readylingua-en-dev.csv'
 target_dir='/home/daniel_tiefenauer/learning_curve_0'
 gpu='2'
 
-while getopts ':hs:' option; do
-  case "$option" in
-    h) echo "$usage"
-       exit
-       ;;
-    t) train_files=$OPTARG
-       ;;
-    v) valid_files=$OPTARG
-       ;;
-    d) target_dir=$OPTARG
-       ;;
-    g) gpu=$OPTARG
-       ;;
-#    :) printf "missing argument for -%s\n" "$OPTARG" >&2
-#       echo "$usage" >&2
-#       exit 1
-#       ;;
-   \?) printf "illegal option: -%s\n" "$OPTARG" >&2
-       echo "$usage" >&2
-       exit 1
-       ;;
-  esac
+POSITIONAL=()
+while [[ $# -gt 0 ]]
+do
+key="$1"
+case $key in
+    -h|--help)
+    echo ${usage}
+    shift # past argument
+    ;;
+    -d|--destination)
+    target_dir="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -t|--train_files)
+    train_files="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -v|--valid_files)
+    valid_files="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -g|--gpu)
+    minutes="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    *)    # unknown option
+    POSITIONAL+=("$1") # save it in an array for later
+    shift # past argument
+    ;;
+esac
 done
-shift $((OPTIND - 1))
+set -- "${POSITIONAL[@]}" # restore positional parameters
 
 echo train_files  = "${train_files}"
 echo valid_files  = "${valid_files}"
