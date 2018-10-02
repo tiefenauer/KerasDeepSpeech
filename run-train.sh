@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # set -xe
-usage="$(basename "$0") [-h|--help] [-r|--run_id <string>] [-d|--destination <path>] [-x|--decoder <string>] [-t|--train_files <path>] [-v|--valid_files <path>] [-m|--minutes <int>] [-g|--gpu <int>]
+usage="$(basename "$0") [-h|--help] [-r|--run_id <string>] [-d|--destination <path>] [-x|--decoder <string>] [-l|--lm <path>] [-a|--lm_vocab <path>] [-t|--train_files <path>] [-v|--valid_files <path>] [-m|--minutes <int>] [-g|--gpu <int>]
 where:
     -h|--help                                show this help text
     -r|--run_id <string>                     run-id to use (used to resume training)
@@ -35,6 +35,7 @@ case $key in
     -h|--help)
     echo ${usage}
     shift # past argument
+    exit
     ;;
     -r|--run_id)
     run_id="$2"
@@ -77,7 +78,7 @@ case $key in
     shift # past value
     ;;
     -g|--gpu)
-    minutes="$2"
+    gpu="$2"
     shift # past argument
     shift # past value
     ;;
