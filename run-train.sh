@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
 # set -xe
-usage="$(basename "$0") [-h] [-r <string>] [-d <path>] [-t <path>] [-v <path>] [-m <int>]
+usage="$(basename "$0") [-h|--help] [-r|--run_id <string>] [-d|--destination <path>] [-x|--decoder <string>] [-t|--train_files <path>] [-v|--valid_files <path>] [-m|--minutes <int>] [-g|--gpu <int>]
 where:
-    -h                              show this help text
-    -r <string>                     run-id to use (used to resume training)
-    -d <path>                       destination directory to store results
-    -x <'beamsearch'|'bestpath'>    decoder to use
-    -t <path>                       path to CSV file containing the corpus files to use for training
-    -v <path>                       path to CSV file containing the corpus files to use for validation
-    -m <int>                        number of minutes of audio for training. If not set or set to 0, all training data will be used (default: 0)
-    -g <int>                        GPU to use
+    -h|--help                                show this help text
+    -r|--run_id <string>                     run-id to use (used to resume training)
+    -d|--destination <path>                  destination directory to store results
+    -x|--decoder <'beamsearch'|'bestpath'>   decoder to use (default: beamsearch)
+    -l|--lm                                  path to n-gram KenLM model (if possible binary)
+    -a|--lm_vocab                            path to file containing the vocabulary of the LM specified by -lm. The file must contain the words used for training delimited by space (no newlines)
+    -t|--train_files <path>                  one or more comma-separated paths to CSV files containing the corpus files to use for training
+    -v|--valid_files <path>                  one or more comma-separated paths to CSV files containing the corpus files to use for validation
+    -m|--minutes <int>                       number of minutes of audio for training. If not set or set to 0, all training data will be used (default: 0)
+    -g|--gpu <int>                           GPU to use (default: 2)
 
 Train a simplified model of the DeepSpeech RNN on a given corpus of training- and validation-data.
 "
@@ -20,6 +22,8 @@ target_dir='/home/daniel_tiefenauer'
 minutes=0
 gpu='2'
 decoder='beamsearch'
+lm='./lm/libri-timit-lm.klm'
+lm_vocab='./lm/words.txt'
 train_files='/media/all/D1/readylingua-en/readylingua-en-train.csv'
 valid_files='/media/all/D1/readylingua-en/readylingua-en-dev.csv'
 
@@ -46,6 +50,16 @@ case $key in
     decoder="$2"
     shift # past argument
     shift # past value
+    ;;
+    -l|--lm)
+    lm="$2"
+    shift
+    shift
+    ;;
+    -a|--lm_vocab)
+    lm_vocab="$2"
+    shift
+    shift
     ;;
     -t|--train_files)
     train_files="$2"
@@ -75,13 +89,23 @@ esac
 done
 set -- "${POSITIONAL[@]}" # restore positional parameters
 
+echo ' '
+echo '-----------------------------------------------------'
+echo ' starting training run with the following parameters'
+echo '-----------------------------------------------------'
 echo run_id       = "${run_id}"
-echo train_files  = "${train_files}"
-echo valid_files  = "${valid_files}"
 echo target_dir   = "${target_dir}"
 echo minutes      = "${minutes}"
 echo decoder      = "${decoder}"
+echo lm           = "${lm}"
+echo lm_vocab     = "${lm_vocab}"
+echo train_files  = "${train_files}"
+echo valid_files  = "${valid_files}"
 echo gpu          = "${gpu}"
+echo ' '
+echo '-----------------------------------------------------'
+echo ' starting training run with the following parameters'
+echo '-----------------------------------------------------'
 
 python3 run-train.py \
     --run_id ${run_id} \

@@ -36,6 +36,11 @@ parser.add_argument('--valid_files', type=str, default='',
                     help='list of all validation files, seperate by a comma if multiple')
 parser.add_argument('--decoder', type=str, default='beamsearch',
                     help='decoder to use (\'beamsearch\', \'bestpath\'). Default: beamsearch')
+parser.add_argument('--lm', type=str,
+                    help='path to KenLM binary file to use for validation')
+parser.add_argument('--lm_vocab', type=str,
+                    help='path to text file containing vocabulary used to train KenLM model. The vocabulary must'
+                         'be words separated by a single whitespace without newlines')
 parser.add_argument('--tensorboard', type=bool, default=True, help='True/False to use tensorboard')
 parser.add_argument('--memcheck', type=bool, default=False, help='print out memory details for each epoch')
 parser.add_argument('--train_batches', type=int, default=0,
@@ -130,7 +135,7 @@ def train_model(model, target_dir, num_minutes=None):
         cb_list.append(tb_cb)
 
     report_cb = ReportCallback(data_valid, model, num_minutes=num_minutes, num_epochs=args.epochs,
-                               target_dir=target_dir, decoder=args.decoder)
+                               target_dir=target_dir, decoder=args.decoder, lm_path=args.lm, vocab_path=args.lm_vocab)
     cb_list.append(report_cb)
 
     model.fit_generator(generator=data_train,

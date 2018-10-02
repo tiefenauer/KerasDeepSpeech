@@ -3,6 +3,7 @@
 import kenlm
 import re
 from heapq import heapify
+from os.path import abspath, dirname, splitext, exists, join, basename
 
 import numpy as np
 from pattern3.metrics import levenshtein_similarity, levenshtein
@@ -40,15 +41,23 @@ def lers(ground_truths, predictions):
     return lers_norm, np.mean(lers_norm), lers_raw, np.mean(lers_raw)
 
 
-def get_LM():
-    """
-    Lazy-load language model (TED corpus, Kneser-Ney, 4-gram, 30k word LM)
-    :return: KenLM language model
-    """
-    global MODEL
-    if MODEL is None:
-        MODEL = kenlm.Model('./lm/libri-timit-lm.klm')
-    return MODEL
+def load_lm(lm_path, vocab_path):
+    global LM_MODELS
+    if lm_path in LM_MODELS:
+        return LM_MODELS[lm_path]
+
+    lm_abs_path = abspath(lm_path)
+    lm_vocab_abs_path = abspath(vocab_path)
+    if not exists(lm_abs_path):
+        raise ValueError(f'ERROR: LM not found at {lm_abs_path}')
+    if not exists(lm_vocab_abs_path):
+        raise ValueError(f'ERROR: LM vocabulary not found at {lm_vocab_abs_path}')
+
+    with open(lm_vocab_abs_path) as vocab_f:
+        lm = kenlm.Model(lm_abs_path)
+        vocab = words(vocab_f.read())
+        LM_MODELS[lm_path] = (lm, vocab)
+    return lm, vocab
 
 
 def words(text):
@@ -60,16 +69,16 @@ def words(text):
     return re.findall(r'\w+', text.lower())
 
 
-def score(word_list):
+def score(word_list, lm):
     """
     Use LM to calculate a log10-based probability for a given sentence (as a list of words)
     :param word_list:
     :return:
     """
-    return get_LM().score(' '.join(word_list), bos=False, eos=False)
+    return lm.score(' '.join(word_list), bos=False, eos=False)
 
 
-def correction(sentence):
+def correction(sentence, lm, lm_vocab):
     """
     Get most probable spelling correction for a given sentence.
     :param sentence:
@@ -78,31 +87,32 @@ def correction(sentence):
     beam_width = 1024
     layer = [(0, [])]  # list of (score, 2-gram)-pairs
     for word in words(sentence):
-        layer = [(-score(node + [word_c]), node + [word_c]) for word_c in candidate_words(word) for sc, node in layer]
+        layer = [(-score(node + [word_c], lm), node + [word_c]) for word_c in candidate_words(word, lm_vocab) for
+                 sc, node in layer]
         heapify(layer)
         layer = layer[:beam_width]
     return ' '.join(layer[0][1])
 
 
-def candidate_words(word):
+def candidate_words(word, lm_vocab):
     """
     Generate possible spelling corrections for a given word.
     :param word: single word as a string
     :return: list of possible spelling corrections for each word
     """
-    return known_words([word]) \
-           or known_words(edits_1(word)) \
-           or known_words(edits_2(word)) \
+    return known_words([word], lm_vocab) \
+           or known_words(edits_1(word), lm_vocab) \
+           or known_words(edits_2(word), lm_vocab) \
            or [word]  # fallback: the original word as a list
 
 
-def known_words(word_list):
+def known_words(word_list, lm_vocab):
     """
     Filters out from a list of words the subset of words that appear in the vocabulary of KNOWN_WORDS.
     :param word_list: list of word-strings
     :return: set of unique words that appear in vocabulary
     """
-    return set(w for w in word_list if w in KNOWN_WORDS)
+    return set(w for w in word_list if w in lm_vocab)
 
 
 def edits_1(word_list):
@@ -130,7 +140,4 @@ def edits_2(word):
 
 
 # globals
-MODEL = None
-# Load known word set
-with open('./lm/words.txt') as f:
-    KNOWN_WORDS = set(words(f.read()))
+LM_MODELS = {}

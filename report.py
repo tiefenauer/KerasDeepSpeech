@@ -1,7 +1,7 @@
 import itertools
 import sys
 from os import makedirs
-from os.path import isdir, join
+from os.path import isdir
 
 import keras.backend as K
 import pandas as pd
@@ -23,7 +23,8 @@ def decode_batch_keras(y_pred, input_length, greedy=True):
 
 class ReportCallback(callbacks.Callback):
     def __init__(self, data_valid, model, target_dir, num_epochs, num_minutes=None, save_progress=True,
-                 early_stopping=False, shuffle_data=True, force_output=False, decoder='beamsearch'):
+                 early_stopping=False, shuffle_data=True, force_output=False, decoder='beamsearch', lm_path=None,
+                 vocab_path=None):
         """
         Will calculate WER and LER at epoch end and print out infered transcriptions from validation set using the 
         current model and weights
@@ -47,6 +48,12 @@ class ReportCallback(callbacks.Callback):
         self.shuffle_data = shuffle_data
         self.force_output = force_output
         self.decoder = decoder
+        self.lm = None
+        self.lm_vocab = None
+        if lm_path:
+            if not vocab_path:
+                raise ValueError('ERROR: Path to vocabulary file must be supplied when supplying path to LM!')
+            self.lm, self.lm_vocab = load_lm(lm_path, vocab_path)
 
         if not isdir(self.target_dir):
             makedirs(self.target_dir)
@@ -101,7 +108,10 @@ class ReportCallback(callbacks.Callback):
             # decoded_res_3 = decode_batch_keras(y_pred_3, input_length_3)
 
             for ground_truth, prediction in zip(batch_inputs['source_str'], decoded_res):
-                pred_lm = correction(prediction)
+                if self.lm and self.lm_vocab:
+                    pred_lm = correction(prediction, self.lm, self.lm_vocab)
+                else:
+                    pred_lm = prediction
 
                 ler_pred = ler(ground_truth, prediction)
                 ler_lm = ler(ground_truth, pred_lm)
