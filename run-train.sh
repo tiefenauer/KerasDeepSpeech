@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # set -xe
-usage="$(basename "$0") [-h|--help] [-r|--run_id <string>] [-d|--destination <path>] [-x|--decoder <string>] [-t|--train_files <path>] [-v|--valid_files <path>] [-m|--minutes <int>] [-g|--gpu <int>]
+usage="$(basename "$0") [-h|--help] [-r|--run_id <string>] [-d|--destination <path>] [-x|--decoder <string>] [-l|--lm <path>] [-a|--lm_vocab <path>] [-t|--train_files <path>] [-v|--valid_files <path>] [-m|--minutes <int>] [-g|--gpu <int>] [-b|--batch_size <int>]
 where:
     -h|--help                                show this help text
     -r|--run_id <string>                     run-id to use (used to resume training)
@@ -12,6 +12,7 @@ where:
     -v|--valid_files <path>                  one or more comma-separated paths to CSV files containing the corpus files to use for validation
     -m|--minutes <int>                       number of minutes of audio for training. If not set or set to 0, all training data will be used (default: 0)
     -g|--gpu <int>                           GPU to use (default: 2)
+    -b|--batch_size <int>                    batch size
 
 Train a simplified model of the DeepSpeech RNN on a given corpus of training- and validation-data.
 "
@@ -21,6 +22,7 @@ run_id=''
 target_dir='/home/daniel_tiefenauer'
 minutes=0
 gpu='2'
+batch_size='16'
 decoder='beamsearch'
 lm='./lm/libri-timit-lm.klm'
 lm_vocab='./lm/words.txt'
@@ -35,6 +37,7 @@ case $key in
     -h|--help)
     echo ${usage}
     shift # past argument
+    exit
     ;;
     -r|--run_id)
     run_id="$2"
@@ -77,9 +80,14 @@ case $key in
     shift # past value
     ;;
     -g|--gpu)
-    minutes="$2"
+    gpu="$2"
     shift # past argument
     shift # past value
+    ;;
+    -b|--batch_size)
+    batch_size="$2"
+    shift
+    shift
     ;;
     *)    # unknown option
     POSITIONAL+=("$1") # save it in an array for later
@@ -102,9 +110,8 @@ echo lm_vocab     = "${lm_vocab}"
 echo train_files  = "${train_files}"
 echo valid_files  = "${valid_files}"
 echo gpu          = "${gpu}"
+echo batch_size   = "${batch_size}"
 echo ' '
-echo '-----------------------------------------------------'
-echo ' starting training run with the following parameters'
 echo '-----------------------------------------------------'
 
 python3 run-train.py \
@@ -115,4 +122,5 @@ python3 run-train.py \
     --gpu ${gpu} \
     --train_files ${train_files} \
     --valid_files ${valid_files} \
+    --batch_size ${batch_size} \
     2>&1 | tee ${target_dir}/${run_id}.log # write to stdout and log file

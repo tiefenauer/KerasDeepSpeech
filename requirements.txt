@@ -1,3 +1,8 @@
+tqdm
+tabulate
+pattern3
+pygit2
+streamtologger
 aubio==0.4.6
 cffi==1.11.5
 funcsigs==1.0.2
