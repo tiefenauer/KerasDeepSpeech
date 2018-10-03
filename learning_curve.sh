@@ -98,8 +98,14 @@ do
         # decoder dimension
         for decoder in 'beamsearch' 'bestpath' 'old'
         do
-            [[$use_lm == true]] && lm="withLM" || lm="noLM"
-            run_id="${minutes}min_${lm}_${decoder}"
+            if [[${use_lm} == true]]; then
+                lm_str="withLM"
+            else
+                lm_str="noLM"
+                lm=''
+                lm_vocab=''
+            fi
+            run_id="${minutes}min_${lm_str}_${decoder}"
 
             mkdir -p ${target_dir}
 
@@ -107,6 +113,7 @@ do
             echo " Training on $minutes, use_lm=$use_lm, decoding=$decoder"
             echo " run id: $run_id"
             echo " target directory: $target_dir"
+            echo " $lm_str: $lm, $lm_vocab"
             echo "#################################################################################################"
 
             bash ./run-train.sh \
