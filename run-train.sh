@@ -111,8 +111,8 @@ echo train_files  = "${train_files}"
 echo valid_files  = "${valid_files}"
 echo gpu          = "${gpu}"
 echo batch_size   = "${batch_size}"
-echo ' '
 echo '-----------------------------------------------------'
+echo ' '
 
 python3 run-train.py \
     --run_id ${run_id} \
