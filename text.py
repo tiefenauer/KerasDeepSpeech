@@ -3,7 +3,7 @@
 import kenlm
 import re
 from heapq import heapify
-from os.path import abspath, dirname, splitext, exists, join, basename
+from os.path import abspath, exists
 
 import numpy as np
 from pattern3.metrics import levenshtein_similarity, levenshtein
@@ -44,6 +44,7 @@ def lers(ground_truths, predictions):
 def load_lm(lm_path, vocab_path):
     global LM_MODELS
     if lm_path in LM_MODELS:
+        print(f'using cached LM and vocab:')
         return LM_MODELS[lm_path]
 
     lm_abs_path = abspath(lm_path)
@@ -54,8 +55,11 @@ def load_lm(lm_path, vocab_path):
         raise ValueError(f'ERROR: LM vocabulary not found at {lm_vocab_abs_path}')
 
     with open(lm_vocab_abs_path) as vocab_f:
+        print(f'loading LM from {lm_abs_path}')
         lm = kenlm.Model(lm_abs_path)
-        vocab = words(vocab_f.read())
+        print(f'loading LM vocab from {lm_vocab_abs_path}')
+        vocab = set(words(vocab_f.read()))
+        print(f'loaded {len(vocab)} words')
         LM_MODELS[lm_path] = (lm, vocab)
     return lm, vocab
 
