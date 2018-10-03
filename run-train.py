@@ -64,8 +64,12 @@ args = parser.parse_args()
 
 
 def main():
-    target_dir = setup()
     print(create_args_str(args))
+
+    target_dir = setup()
+    print()
+    print(f'all output will be written to {target_dir}')
+    print()
 
     model = create_model(target_dir)
 

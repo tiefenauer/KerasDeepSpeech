@@ -55,11 +55,12 @@ def load_lm(lm_path, vocab_path):
         raise ValueError(f'ERROR: LM vocabulary not found at {lm_vocab_abs_path}')
 
     with open(lm_vocab_abs_path) as vocab_f:
-        print(f'loading LM from {lm_abs_path}')
+        print(f'loading LM from {lm_abs_path}...', end='')
         lm = kenlm.Model(lm_abs_path)
-        print(f'loading LM vocab from {lm_vocab_abs_path}')
+        print(f'done! Loaded {lm.order}-gram model.')
+        print(f'loading LM vocab from {lm_vocab_abs_path}...', end='')
         vocab = set(words(vocab_f.read()))
-        print(f'loaded {len(vocab)} words')
+        print(f'done! Loaded {len(vocab)} words.')
         LM_MODELS[lm_path] = (lm, vocab)
     return lm, vocab
 

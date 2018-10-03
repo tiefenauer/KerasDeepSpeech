@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # set -xe
-usage="$(basename "$0") [-h|--help] [-d|--destination <path>] [-t|--train_files <path>] [-v|--valid_files <path>] [-g|--gpu] [-b|--batch_size <int>] [-e|--epochs <int>]
+usage="$(basename "$0") [-h|--help] [-d|--destination <path>] [-t|--train_files <path>] [-v|--valid_files <path>] [-g|--gpu] [-b|--batch_size <int>] [-e|--epochs <int>] [-x|--decoder <string>] [-l|--lm <path>] [-a|--lm_vocab <path>]
 where:
     -h|--help                                show this help text
     -d|--destination <path>                  destination directory to store results
@@ -103,19 +103,19 @@ echo epochs       = "${epochs}"
 # time dimension
 for minutes in 1 10 100 1000
 do
-    run_id="${minutes}min_${decoder}"
-
-    mkdir -p ${target_dir}
+    run_id="${minutes}_min_${decoder}"
+    target_subdir=${target_dir}/${run_id}
+    mkdir -p ${target_subdir}
 
     echo "#################################################################################################"
     echo " Training on $minutes, decoding=$decoder"
     echo " run id: $run_id"
-    echo " target directory: $target_dir"
+    echo " target subdirectory: target_subdir"
     echo "#################################################################################################"
 
     python3 run-train.py \
         --run_id ${run_id} \
-        --target_dir ${target_dir} \
+        --target_dir ${target_subdir} \
         --minutes ${minutes} \
         --decoder ${decoder} \
         --lm ${lm} \
