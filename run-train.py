@@ -95,7 +95,7 @@ def setup():
         args.train_files = abspath(join(test_path, "ldc93s1.csv"))
         args.valid_files = abspath(join(test_path, "ldc93s1.csv"))
 
-    os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
+    # os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
     config = tf.ConfigProto()
     config.gpu_options.visible_device_list = args.gpu
     config.gpu_options.allow_growth = True
