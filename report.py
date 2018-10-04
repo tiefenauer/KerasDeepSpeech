@@ -1,7 +1,7 @@
 import itertools
 import sys
 from os import makedirs
-from os.path import isdir
+from os.path import isdir, join
 
 import keras.backend as K
 import pandas as pd

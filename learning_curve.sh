@@ -110,7 +110,7 @@ do
     echo "#################################################################################################"
     echo " Training on $minutes, decoding=$decoder"
     echo " run id: $run_id"
-    echo " target subdirectory: target_subdir"
+    echo " target subdirectory: $target_subdir"
     echo "#################################################################################################"
 
     python3 run-train.py \
