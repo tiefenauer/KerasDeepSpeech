@@ -113,14 +113,15 @@ do
                 lm=''
                 lm_vocab=''
             fi
-            run_id="${minutes}min_${lm_str}_${decoder}"
+            run_id="${minutes}_min_${lm_str}_${decoder}"
+            target_subdir=${target_dir%/}/${run_id}
 
-            mkdir -p ${target_dir}
+            mkdir -p ${target_subdir}
 
             echo "#################################################################################################"
             echo " Training on $minutes, use_lm=$use_lm, decoding=$decoder"
             echo " run id: $run_id"
-            echo " target directory: $target_dir"
+            echo " target subdirectory: $target_subdir"
             echo " $lm_str: $lm, $lm_vocab"
             echo "#################################################################################################"
 

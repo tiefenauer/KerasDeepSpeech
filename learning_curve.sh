@@ -68,7 +68,7 @@ case $key in
     shift # past value
     ;;
     -g|--gpu)
-    minutes="$2"
+    gpu="$2"
     shift # past argument
     shift # past value
     ;;
@@ -104,7 +104,7 @@ echo epochs       = "${epochs}"
 for minutes in 1 10 100 1000
 do
     run_id="${minutes}_min_${decoder}"
-    target_subdir=${target_dir}/${run_id}
+    target_subdir=${target_dir%/}/${run_id}
     mkdir -p ${target_subdir}
 
     echo "#################################################################################################"
