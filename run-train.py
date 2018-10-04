@@ -97,9 +97,9 @@ def setup():
         args.valid_files = abspath(join(test_path, "ldc93s1.csv"))
 
     # os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
-    config = tf.ConfigProto()
+    config = tf.ConfigProto(log_device_placement=True)
     config.gpu_options.visible_device_list = args.gpu
-    config.gpu_options.allow_growth = True
+    # config.gpu_options.allow_growth = True
     session = tf.Session(config=config)
     K.set_session(session)
 
