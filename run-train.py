@@ -24,7 +24,7 @@ from utils import load_model_checkpoint, MemoryCallback
 
 #######################################################
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Prevent pool_allocator message
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+# os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 #######################################################
 
 parser = argparse.ArgumentParser()
@@ -97,11 +97,11 @@ def setup():
         args.valid_files = abspath(join(test_path, "ldc93s1.csv"))
 
     # os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
-    config = tf.ConfigProto()
-    config.gpu_options.visible_device_list = args.gpu
-    config.gpu_options.allow_growth = True
-    session = tf.Session(config=config)
-    K.set_session(session)
+    # config = tf.ConfigProto()
+    # config.gpu_options.visible_device_list = args.gpu
+    # config.gpu_options.allow_growth = True
+    # session = tf.Session(config=config)
+    # K.set_session(session)
 
     return target_dir
 
