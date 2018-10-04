@@ -24,6 +24,7 @@ from utils import load_model_checkpoint, MemoryCallback
 
 #######################################################
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Prevent pool_allocator message
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 #######################################################
 
 parser = argparse.ArgumentParser()
