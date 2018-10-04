@@ -19,10 +19,10 @@ For each amount of training data a separate training run is started. A unique ru
 "
 
 # Defaults
-learning_run_id=''
+learning_run_id="learning_run_$(uuidgen)"
 lm=''
 lm_vocab=''
-decoder=''
+decoder='beamsearch'
 train_files='/media/all/D1/readylingua-en/readylingua-en-train.csv'
 valid_files='/media/all/D1/readylingua-en/readylingua-en-dev.csv'
 target_dir='/home/daniel_tiefenauer/learning_curve_0'
@@ -97,26 +97,30 @@ esac
 done
 set -- "${POSITIONAL[@]}" # restore positional parameters
 
-echo ' '
-echo '-----------------------------------------------------'
-echo ' starting learning curve with the following parameters'
-echo '-----------------------------------------------------'
-echo learning_run_id = "${learning_run_id}"
-echo target_dir      = "${target_dir}"
-echo lm              = "${lm}"
-echo lm_vocab        = "${lm_vocab}"
-echo decoder         = "${decoder}"
-echo train_files     = "${train_files}"
-echo valid_files     = "${valid_files}"
-echo gpu             = "${gpu}"
-echo batch_size      = "${batch_size}"
-echo epochs          = "${epochs}"
+target_dir=${target_dir%/}/${learning_run_id}
+mkdir -p ${target_dir}
+
+echo "
+-----------------------------------------------------'
+ starting learning curve with the following parameters'
+-----------------------------------------------------'
+learning_run_id = ${learning_run_id}
+target_dir      = ${target_dir}
+lm              = ${lm}
+lm_vocab        = ${lm_vocab}
+decoder         = ${decoder}
+train_files     = ${train_files}
+valid_files     = ${valid_files}
+gpu             = ${gpu}
+batch_size      = ${batch_size}
+epochs          = ${epochs}
+" | tee ${target_dir%/}/${learning_run_id}.log
 
 # time dimension
 for minutes in 1 10 100 1000
 do
     run_id="${minutes}_min_${decoder}"
-    target_subdir=${target_dir%/}/${learning_run_id%/}/${run_id}
+    target_subdir=${target_dir%/}/${run_id}
     mkdir -p ${target_subdir}
 
     echo "#################################################################################################"
