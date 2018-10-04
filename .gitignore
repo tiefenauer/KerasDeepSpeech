@@ -20,3 +20,8 @@ data/*
 !data-recorder.py
 /checkpoints/
 /tensorboard/
+/bin/
+/lib
+/lib64
+/pyvenv.cfg
+/share/

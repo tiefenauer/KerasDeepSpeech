@@ -26,8 +26,8 @@ For each element in the cartesian product of these dimensions a training run is 
 gs_run_id="grid_search_$(uuidgen)"
 lm=''
 lm_vocab=''
-train_files='/media/all/D1/readylingua-en/readylingua-en-train.csv'
-valid_files='/media/all/D1/readylingua-en/readylingua-en-dev.csv'
+train_files='/media/D1/readylingua-en/readylingua-en-train.csv'
+valid_files='/media/D1/readylingua-en/readylingua-en-dev.csv'
 target_dir='/home/daniel_tiefenauer/learning_curve_0'
 gpu='2'
 batch_size='16'

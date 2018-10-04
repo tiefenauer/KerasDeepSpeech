@@ -28,8 +28,8 @@ epochs='20'
 decoder='beamsearch'
 lm='./lm/libri-timit-lm.klm'
 lm_vocab='./lm/words.txt'
-train_files='/media/all/D1/readylingua-en/readylingua-en-train.csv'
-valid_files='/media/all/D1/readylingua-en/readylingua-en-dev.csv'
+train_files='/media/D1/readylingua-en/readylingua-en-train.csv'
+valid_files='/media/D1/readylingua-en/readylingua-en-dev.csv'
 
 POSITIONAL=()
 while [[ $# -gt 0 ]]

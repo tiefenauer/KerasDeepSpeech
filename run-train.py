@@ -71,7 +71,8 @@ def main():
     print(f'all output will be written to {target_dir}')
     print()
 
-    model = create_model(target_dir)
+    opt = SGD(lr=args.learning_rate, decay=1e-6, momentum=0.9, nesterov=True, clipnorm=5)
+    model = create_model(target_dir, opt)
 
     train_model(model, target_dir, args.minutes)
 
@@ -104,19 +105,17 @@ def setup():
     return target_dir
 
 
-def create_model(target_dir):
+def create_model(target_dir, opt):
     if args.model_path:
         print(f'trying to load model from {target_dir}')
         if not isdir(args.model_path):
             print(f'ERROR: directory {target_dir} does not exist!', file=sys.stderr)
             exit(0)
-        model = load_model_checkpoint(target_dir)
+        model = load_model_checkpoint(target_dir, opt)
     else:
         print('Creating new model')
         # model = deep_speech_dropout(input_dim=26, fc_size=args.fc_size, rnn_size=args.rnn_size, output_dim=29)
         model = ds1(input_dim=26, fc_size=args.fc_size, rnn_size=args.rnn_size, output_dim=29)
-        # opt = Adam(lr=args.learning_rate, beta_1=0.9, beta_2=0.999, epsilon=1e-8, clipnorm=5)
-        opt = SGD(lr=args.learning_rate, decay=1e-6, momentum=0.9, nesterov=True, clipnorm=5)
         model.compile(optimizer=opt, loss=ctc)
 
     model.summary()
@@ -125,9 +124,9 @@ def create_model(target_dir):
 
 def train_model(model, target_dir, num_minutes=None):
     print("Creating data batch generators")
-    data_train = CSVBatchGenerator(args.train_files, shuffle=False, n_batches=args.train_batches,
+    data_train = CSVBatchGenerator(args.train_files, sort=False, n_batches=args.train_batches,
                                    batch_size=args.batch_size, num_minutes=num_minutes)
-    data_valid = CSVBatchGenerator(args.valid_files, shuffle=True, n_batches=args.valid_batches,
+    data_valid = CSVBatchGenerator(args.valid_files, sort=True, n_batches=args.valid_batches,
                                    batch_size=args.batch_size)
 
     cb_list = []
@@ -139,7 +138,7 @@ def train_model(model, target_dir, num_minutes=None):
         cb_list.append(tb_cb)
 
     report_cb = ReportCallback(data_valid, model, num_minutes=num_minutes, num_epochs=args.epochs,
-                               target_dir=target_dir, decoder=args.decoder, lm_path=args.lm, vocab_path=args.lm_vocab)
+                               target_dir=target_dir, decode_strategy=args.decoder, lm_path=args.lm, vocab_path=args.lm_vocab)
     cb_list.append(report_cb)
 
     model.fit_generator(generator=data_train,

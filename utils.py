@@ -10,7 +10,7 @@ from keras.models import model_from_json
 from pympler import muppy, summary, tracker
 from pympler.web import start_in_background
 
-from model import clipped_relu, selu
+from model import clipped_relu, selu, ctc
 
 
 # these text/int characters are modified
@@ -31,13 +31,13 @@ def save_trimmed_model(model, name):
     return
 
 
-def save_model(model, target_dir, base_name='model'):
+def save_model(model, target_dir):
     if not exists(target_dir):
         makedirs(target_dir)
 
-    model_path = join(target_dir, f'{base_name}.h5')
-    json_path = join(target_dir, f'{base_name}.json')
-    weights_path = join(target_dir, f'{base_name}_weights.h5')
+    model_path = join(target_dir, 'model.h5')
+    json_path = join(target_dir, 'arch.json')
+    weights_path = join(target_dir, 'weights.h5')
     print(f'Saving model in {model_path}, weights in {weights_path} and architecture in {json_path}')
 
     model.save(model_path)
@@ -46,7 +46,7 @@ def save_model(model, target_dir, base_name='model'):
         json_file.write(model.to_json())
 
 
-def load_model_checkpoint(root_path):
+def load_model_checkpoint(root_path, opt=None):
     # this is a terrible hack
     from keras.utils.generic_utils import get_custom_objects
     get_custom_objects().update({"clipped_relu": clipped_relu})
@@ -59,20 +59,26 @@ def load_model_checkpoint(root_path):
         K.set_learning_phase(1)
         return load_model(model_h5)
 
-    model_arch = join(root_path, "model.json")
-    model_weights = join(root_path, "model_weights.h5")
+    model_arch = join(root_path, "arch.json")
+    if not exists(model_arch):
+        raise ValueError(f'ERROR: No HDF5 model found at {root_path} and also no architecture found at {model_arch}!')
 
-    if exists(model_arch) and exists(model_weights):
-        with open(model_arch, 'r') as json_file:
-            print(f'loading model architecture from {model_arch} and weights from {model_weights}')
-            loaded_model_json = json_file.read()
+    model_weights = join(root_path, "weights.h5")
+    if not exists(model_arch):
+        raise ValueError(f'ERROR: architecture found in {model_arch}, but no weights in {model_weights}')
 
-            K.set_learning_phase(1)
-            loaded_model = model_from_json(loaded_model_json)
-            loaded_model.load_weights(model_weights)
-            return loaded_model
+    if not opt:
+        raise ValueError(f'ERROR: you must supply an optimizer when trying to load from architecture/weights !')
 
-    return None
+    with open(model_arch, 'r') as json_file:
+        print(f'loading model architecture from {model_arch} and weights from {model_weights}')
+        loaded_model_json = json_file.read()
+
+        K.set_learning_phase(1)
+        loaded_model = model_from_json(loaded_model_json)
+        loaded_model.load_weights(model_weights)
+        loaded_model.compile(optimizer=opt, loss=ctc)
+        return loaded_model
 
 
 memlist = []

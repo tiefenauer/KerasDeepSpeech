@@ -15,11 +15,11 @@ from util.rnn_util import encode
 
 
 class BatchGenerator(object):
-    def __init__(self, n, shuffle, batch_size):
+    def __init__(self, n, batch_size, infinite):
         self.n = n
-        self.shuffle = shuffle
         self.batch_size = batch_size
         self.cur_index = 0
+        self.infinite = infinite
 
     def __len__(self):
         return self.n // self.batch_size  # number of batches
@@ -33,13 +33,16 @@ class BatchGenerator(object):
         function is an endless loop over set.
         :return:
         """
-        while True:
-            if (self.cur_index + 1) * self.batch_size > self.n:
+        while self.has_next():
+            if self.infinite and not self.has_next():
                 self.cur_index = 0
 
             ret = self.get_batch(self.cur_index)
             self.cur_index += 1
             return ret
+
+    def has_next(self):
+        return (self.cur_index + 1) * self.batch_size < self.n
 
     def get_batch(self, idx):
         index_array = range(idx * self.batch_size, (idx + 1) * self.batch_size)
@@ -89,8 +92,8 @@ class BatchGenerator(object):
 
 class CSVBatchGenerator(BatchGenerator):
 
-    def __init__(self, csv_path, shuffle=False, n_batches=None, batch_size=16, num_minutes=None):
-        df = read_data_from_csv(csv_path=csv_path, sort=True)
+    def __init__(self, csv_path, sort=False, n_batches=None, batch_size=16, num_minutes=None, infinite=True):
+        df = read_data_from_csv(csv_path=csv_path, sort=sort)
         if n_batches:
             df = df.head(n_batches * batch_size)
         elif num_minutes:
@@ -112,7 +115,7 @@ class CSVBatchGenerator(BatchGenerator):
         self.wav_lengths = df['wav_length'].tolist()
         self.transcripts = df['transcript'].tolist()
 
-        super().__init__(n=len(df.index), batch_size=batch_size, shuffle=shuffle)
+        super().__init__(n=len(df.index), batch_size=batch_size, infinite=infinite)
         del df
 
     def shuffle_entries(self):
