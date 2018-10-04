@@ -119,7 +119,7 @@ do
             mkdir -p ${target_subdir}
 
             echo "#################################################################################################"
-            echo " Training on $minutes, use_lm=$use_lm, decoding=$decoder"
+            echo " Training on $minutes minutes, use_lm=$use_lm, decoding=$decoder"
             echo " run id: $run_id"
             echo " target subdirectory: $target_subdir"
             echo " $lm_str: $lm, $lm_vocab"
