@@ -104,11 +104,18 @@ class CSVBatchGenerator(BatchGenerator):
                 Training will be done on the whole dataset.""")
             else:
                 clip_ix = 0
-                while sum(df['wav_length'][:clip_ix]) < num_minutes * 60 and clip_ix < len(df.index):
+                batch_filled = False
+                while (sum(df['wav_length'][:clip_ix]) < num_minutes * 60  # total length must be required length
+                       and clip_ix < len(df.index)  # don't use more samples than available
+                       or clip_ix < batch_size):  # but use at least enough samples to fill a batch
                     clip_ix += 1
+                    if sum(df['wav_length'][:clip_ix]) > num_minutes * 60 and clip_ix == batch_size:
+                        batch_filled = True
                 df = df.head(clip_ix)
                 audio_length = sum(df['wav_length'])
                 print(f'clipped to first {clip_ix} samples ({timedelta(seconds=audio_length)} minutes).')
+                if batch_filled:
+                    print(f'total length is larger to fill at least 1 batch')
 
         self.wav_files = df['wav_filename'].tolist()
         self.wav_sizes = df['wav_filesize'].tolist()
