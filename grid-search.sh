@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # set -xe
-usage="$(basename "$0") [-h|--help] [-d|--destination <path>] [-t|--train_files <path>] [-v|--valid_files <path>] [-g|--gpu] [-b|--batch_size <int>] [-e|--epochs <int>]
+usage="$(basename "$0") [-h|--help] [-r|--run_id <string>] [-d|--destination <path>] [-t|--train_files <path>] [-v|--valid_files <path>] [-g|--gpu] [-b|--batch_size <int>] [-e|--epochs <int>]
 where:
     -h|--help                    show this help text
+    -r|--run_id <string>         run-id to use (used to resume training)    
     -d|--destination <path>      destination directory to store results
     -l|--lm                      path to n-gram KenLM model (if possible binary)
     -a|--lm_vocab                path to file containing the vocabulary of the LM specified by -lm. The file must contain the words used for training delimited by space (no newlines)
@@ -22,6 +23,7 @@ For each element in the cartesian product of these dimensions a training run is 
 "
 
 # Defaults
+gs_run_id="grid_search_$(uuidgen)"
 lm=''
 lm_vocab=''
 train_files='/media/all/D1/readylingua-en/readylingua-en-train.csv'
@@ -38,12 +40,18 @@ key="$1"
 case $key in
     -h|--help)
     echo ${usage}
-    shift # past argument
+    shift
+    exit
+    ;;
+    -r|--run_id)
+    gs_run_id="$2"
+    shift
+    shift
     ;;
     -d|--destination)
     target_dir="$2"
-    shift # past argument
-    shift # past value
+    shift
+    shift
     ;;
     -l|--lm)
     lm="$2"
@@ -57,18 +65,18 @@ case $key in
     ;;
     -t|--train_files)
     train_files="$2"
-    shift # past argument
-    shift # past value
+    shift
+    shift
     ;;
     -v|--valid_files)
     valid_files="$2"
-    shift # past argument
-    shift # past value
+    shift
+    shift
     ;;
     -g|--gpu)
-    minutes="$2"
-    shift # past argument
-    shift # past value
+    gpu="$2"
+    shift
+    shift
     ;;
     -b|--batch_size)
     batch_size="$2"
@@ -82,20 +90,31 @@ case $key in
     ;;
     *)    # unknown option
     POSITIONAL+=("$1") # save it in an array for later
-    shift # past argument
+    shift
     ;;
 esac
 done
 set -- "${POSITIONAL[@]}" # restore positional parameters
 
-echo target_dir   = "${target_dir}"
-echo lm           = "${lm}"
-echo lm_vocab     = "${lm_vocab}"
-echo train_files  = "${train_files}"
-echo valid_files  = "${valid_files}"
-echo gpu          = "${gpu}"
-echo batch_size   = "${batch_size}"
-echo epochs       = "${epochs}"
+gs_result_dir=${target_dir%/}/${gs_run_id}
+mkdir -p ${gs_result_dir}
+
+echo "
+-----------------------------------------------------
+ starting learning curve with the following parameters
+-----------------------------------------------------
+gs_run_id     = ${gs_run_id}
+gs_result_dir = ${gs_result_dir}
+target_dir    = ${target_dir}
+lm            = ${lm}
+lm_vocab      = ${lm_vocab}
+train_files   = ${train_files}
+valid_files   = ${valid_files}
+gpu           = ${gpu}
+batch_size    = ${batch_size}
+epochs        = ${epochs}
+-----------------------------------------------------
+" | tee ${gs_result_dir%/}/${gs_run_id}.log
 
 # time dimension
 for minutes in 1 10 100 1000
@@ -118,12 +137,15 @@ do
 
             mkdir -p ${target_subdir}
 
-            echo "#################################################################################################"
-            echo " Training on $minutes minutes, use_lm=$use_lm, decoding=$decoder"
-            echo " run id: $run_id"
-            echo " target subdirectory: $target_subdir"
-            echo " $lm_str: $lm, $lm_vocab"
-            echo "#################################################################################################"
+            echo "
+            #################################################################################################
+             Training on $minutes minutes, use_lm=$use_lm, decoding=$decoder
+             run id: $run_id
+             target subdirectory: $target_subdir
+             LM: $lm
+             LM vocab: $lm_vocab
+            #################################################################################################
+            "
 
             python3 run-train.py \
                     --run_id ${run_id} \
@@ -139,9 +161,11 @@ do
                     --valid_files ${valid_files} \
                     2>&1 | tee ${target_dir}/${run_id}.log # write to stdout and log file
 
-            echo "#################################################################################################"
-            echo " Finished $run_id"
-            echo "#################################################################################################"
+            echo "
+            #################################################################################################
+             Finished $run_id
+            #################################################################################################
+            "
         done
 
     done

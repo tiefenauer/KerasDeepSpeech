@@ -19,7 +19,7 @@ For each amount of training data a separate training run is started. A unique ru
 "
 
 # Defaults
-learning_run_id="learning_run_$(uuidgen)"
+lc_run_id="learning_run_$(uuidgen)"
 lm=''
 lm_vocab=''
 decoder='beamsearch'
@@ -37,17 +37,18 @@ key="$1"
 case $key in
     -h|--help)
     echo ${usage}
-    shift # past argument
+    shift
+    exit
     ;;
     -r|--run_id)
-    learning_run_id="$2"
-    shift # past argument
-    shift # past value
+    lc_run_id="$2"
+    shift
+    shift
     ;;
     -d|--destination)
     target_dir="$2"
-    shift # past argument
-    shift # past value
+    shift
+    shift
     ;;
     -l|--lm)
     lm="$2"
@@ -61,23 +62,23 @@ case $key in
     ;;
     -x|--decoder)
     decoder="$2"
-    shift # past argument
-    shift # past value
+    shift
+    shift
     ;;
     -t|--train_files)
     train_files="$2"
-    shift # past argument
-    shift # past value
+    shift
+    shift
     ;;
     -v|--valid_files)
     valid_files="$2"
-    shift # past argument
-    shift # past value
+    shift
+    shift
     ;;
     -g|--gpu)
     gpu="$2"
-    shift # past argument
-    shift # past value
+    shift
+    shift
     ;;
     -b|--batch_size)
     batch_size="$2"
@@ -91,21 +92,22 @@ case $key in
     ;;
     *)    # unknown option
     POSITIONAL+=("$1") # save it in an array for later
-    shift # past argument
+    shift
     ;;
 esac
 done
 set -- "${POSITIONAL[@]}" # restore positional parameters
 
-target_dir=${target_dir%/}/${learning_run_id}
-mkdir -p ${target_dir}
+lc_result_dir=${target_dir%/}/${lc_run_id}
+mkdir -p ${lc_result_dir}
 
 echo "
------------------------------------------------------'
- starting learning curve with the following parameters'
------------------------------------------------------'
-learning_run_id = ${learning_run_id}
+-----------------------------------------------------
+ starting learning curve with the following parameters
+-----------------------------------------------------
+lc_run_id       = ${lc_run_id}
 target_dir      = ${target_dir}
+lc_result_dir   = ${lc_result_dir}
 lm              = ${lm}
 lm_vocab        = ${lm_vocab}
 decoder         = ${decoder}
@@ -114,25 +116,26 @@ valid_files     = ${valid_files}
 gpu             = ${gpu}
 batch_size      = ${batch_size}
 epochs          = ${epochs}
-" | tee ${target_dir%/}/${learning_run_id}.log
+-----------------------------------------------------
+" | tee ${lc_result_dir%/}/${lc_run_id}.log
 
-# time dimension
+
 for minutes in 1 10 100 1000
 do
     run_id="${minutes}_min_${decoder}"
-    target_subdir=${target_dir%/}/${run_id}
-    mkdir -p ${target_subdir}
 
-    echo "#################################################################################################"
-    echo " Training on $minutes minutes, decoding=$decoder"
-    echo " learning run id: $learning_run_id"
-    echo " run id: $run_id"
-    echo " target subdirectory: $target_subdir"
-    echo "#################################################################################################"
+    echo "
+    #################################################################################################
+     Training on $minutes minutes, decoding=$decoder
+     learning run id: $lc_run_id
+     run id: $run_id
+     target subdirectory: $lc_result_dir
+    #################################################################################################
+    "
 
     python3 run-train.py \
         --run_id ${run_id} \
-        --target_dir ${target_subdir} \
+        --target_dir ${lc_result_dir} \
         --minutes ${minutes} \
         --decoder ${decoder} \
         --lm ${lm} \
@@ -142,9 +145,11 @@ do
         --epochs ${epochs} \
         --train_files ${train_files} \
         --valid_files ${valid_files} \
-        2>&1 | tee ${target_dir}/${run_id}.log # write to stdout and log file
+        2>&1 | tee ${lc_result_dir}/${run_id}.log # write to stdout and log file
 
-    echo "#################################################################################################"
-    echo " Finished $run_id"
-    echo "#################################################################################################"
+    echo "
+    #################################################################################################
+     Finished $run_id
+    #################################################################################################
+    "
 done
