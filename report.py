@@ -110,7 +110,7 @@ class ReportCallback(callbacks.Callback):
             print("shuffling validation data")
             self.data_valid.shuffle_entries()
 
-        print(f'validating epoch {epoch+1} using {self.decoder} decoding')
+        print(f'validating epoch {epoch+1} using {self.decoder.decode_strategy} decoding')
         originals, results = [], []
         self.data_valid.cur_index = 0  # reset index
 
@@ -125,10 +125,10 @@ class ReportCallback(callbacks.Callback):
 
             for ground_truth, prediction in zip(ground_truths, predictions):
                 if self.lm and self.lm_vocab:
-                    using_lm = f'({self.decoder} decoding, using LM)'
+                    using_lm = f'({self.decoder.decode_strategy} decoding, using LM)'
                     pred_lm = correction(prediction, self.lm, self.lm_vocab)
                 else:
-                    using_lm = f'({self.decoder} decoding, not using LM)'
+                    using_lm = f'({self.decoder.decode_strategy} decoding, not using LM)'
                     pred_lm = prediction
 
                 ler_pred = ler(ground_truth, prediction)
