@@ -93,14 +93,13 @@ class BatchGenerator(object):
 class CSVBatchGenerator(BatchGenerator):
 
     def __init__(self, csv_path, sort=False, n_batches=None, batch_size=16, num_minutes=None, infinite=True):
-        df = read_data_from_csv(csv_path=csv_path, sort=sort)
+        df, total_audio_length = read_data_from_csv(csv_path=csv_path, sort=sort)
         if n_batches:
             df = df.head(n_batches * batch_size)
         elif num_minutes:
             # truncate dataset to first {num_minutes} minutes of audio data
-            max_audio_length = sum(df['wav_length'])
-            if num_minutes * 60 > max_audio_length:
-                print(f"""WARNING: {num_minutes} minutes is longer than total length of the dataset ({timedelta(seconds=max_audio_length)})!
+            if num_minutes * 60 > total_audio_length:
+                print(f"""WARNING: {num_minutes} minutes is longer than total length of the dataset ({timedelta(seconds=total_audio_length)})!
                 Training will be done on the whole dataset.""")
             else:
                 clip_ix = 0
@@ -142,7 +141,8 @@ def read_data_from_csv(csv_path, sort=True, create_word_list=False):
 
     print(f'Reading samples from {csv_path}...', end='')
     df = pd.read_csv(csv_path, sep=',', encoding='utf-8')
-    print(f'done! ({len(df.index)} samples)')
+    total_audio_length = sum(df['wav_length'])
+    print(f'done! ({len(df.index)} samples, {timedelta(seconds=total_audio_length)})')
 
     if create_word_list:
         df['transcript'].to_csv(join('lm', 'df_all_word_list.csv'), header=False, index=False)
@@ -150,7 +150,7 @@ def read_data_from_csv(csv_path, sort=True, create_word_list=False):
     if sort:
         df = df.sort_values(by='wav_filesize', ascending=True)
 
-    return df.reset_index(drop=True)
+    return df.reset_index(drop=True), total_audio_length
 
 
 def extract_mfcc(wav_file_path):
