@@ -115,10 +115,10 @@ class CSVBatchGenerator(BatchGenerator):
                 if batch_filled:
                     print(f'total length is larger to fill at least 1 batch')
 
-        self.wav_files = df['wav_filename'].tolist()
+        self.wav_files = [join(dirname(abspath(csv_path)), wav_file) for wav_file in df['wav_filename']]
+        self.transcripts = df['transcript'].tolist()
         self.wav_sizes = df['wav_filesize'].tolist()
         self.wav_lengths = df['wav_length'].tolist()
-        self.transcripts = df['transcript'].tolist()
 
         super().__init__(n=len(df.index), batch_size=batch_size)
         del df
