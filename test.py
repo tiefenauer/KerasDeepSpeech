@@ -7,7 +7,7 @@ valid_batches = 1
 batch_size = 16
 
 data_valid = CSVBatchGenerator(valid_files, sort=True, n_batches=valid_batches,
-                               batch_size=batch_size, infinite=False)
+                               batch_size=batch_size)
 
 for _ in tqdm(range(len(data_valid))):
     batch_inputs, _ = next(data_valid)
