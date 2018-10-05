@@ -33,15 +33,12 @@ class BatchGenerator(object):
         :return:
         """
         while True:
-            if not self.has_next():
+            if (self.cur_index + 1) * self.batch_size > self.n:
                 self.cur_index = 0
 
             ret = self.get_batch(self.cur_index)
             self.cur_index += 1
             return ret
-
-    def has_next(self):
-        return (self.cur_index + 1) * self.batch_size < self.n
 
     def get_batch(self, idx):
         index_array = range(idx * self.batch_size, (idx + 1) * self.batch_size)
