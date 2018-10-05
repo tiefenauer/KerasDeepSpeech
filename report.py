@@ -1,3 +1,4 @@
+import itertools
 import sys
 from os import makedirs
 from os.path import isdir, join
@@ -13,31 +14,6 @@ from util.rnn_util import decode
 from utils import save_model
 
 
-class Decoder(object):
-    def __init__(self, model, decode_strategy):
-        if decode_strategy not in ['old', 'bestpath', 'beamsearch']:
-            raise ValueError(f'ERROR: invalid value \'{decode_strategy}\' for decode_strategy')
-
-        self.ctc_input = model.get_layer('ctc').input[0]
-        self.input_data = model.get_layer('the_input').input
-        self.test_func = K.function([self.input_data, K.learning_phase()], [self.ctc_input])
-        self.decode_strategy = decode_strategy
-
-    def decode(self, batch_input, batch_input_lenghts):
-        K.set_learning_phase(0)
-
-        y_pred = self.test_func([batch_input])[0]
-
-        if self.decode_strategy == 'old':
-            predictions = decode_batch(self.test_func, batch_input)
-        else:
-            predictions = decode_batch_keras(y_pred, batch_input_lenghts, self.decode_strategy == 'bestpath')
-
-        K.set_learning_phase(1)
-
-        return predictions
-
-
 def decode_batch_keras(y_pred, input_length, greedy=True):
     # https://www.dlology.com/blog/how-to-train-a-keras-model-to-recognize-variable-length-text/
     decoded_int = K.get_value(K.ctc_decode(y_pred=y_pred, input_length=input_length, greedy=greedy)[0][0])
@@ -45,23 +21,10 @@ def decode_batch_keras(y_pred, input_length, greedy=True):
     return decoded_str
 
 
-def decode_batch(test_func, word_batch):
-    ret = []
-    y_pred = test_func([word_batch])[0]  # 16xTIMEx29 = batch x time x classes
-
-    for out in y_pred:
-        best = list(np.argmax(out, axis=1))
-        merge = [k for k, g in itertools.groupby(best)]
-        # outStr = int_to_text_sequence(merge)
-        ret.append(decode(merge))
-
-    return ret
-
-
 class ReportCallback(callbacks.Callback):
     def __init__(self, data_valid, model, target_dir, num_epochs, num_minutes=None, save_progress=True,
-                 early_stopping=False, shuffle_data=True, force_output=False, decode_strategy='beamsearch',
-                 lm_path=None, vocab_path=None):
+                 early_stopping=False, shuffle_data=True, force_output=False, decode_strategy='beamsearch', lm_path=None,
+                 vocab_path=None):
         """
         Will calculate WER and LER at epoch end and print out infered transcriptions from validation set using the 
         current model and weights
@@ -84,6 +47,7 @@ class ReportCallback(callbacks.Callback):
         self.early_stopping = early_stopping
         self.shuffle_data = shuffle_data
         self.force_output = force_output
+        self.decode_strategy = decode_strategy
         self.lm = None
         self.lm_vocab = None
         if lm_path:
@@ -94,7 +58,9 @@ class ReportCallback(callbacks.Callback):
         if not isdir(self.target_dir):
             makedirs(self.target_dir)
 
-        self.decoder = Decoder(model, decode_strategy)
+        y_pred = model.get_layer('ctc').input[0]
+        input_data = model.get_layer('the_input').input
+        self.test_func = K.function([input_data, K.learning_phase()], [y_pred])
 
         # WER/LER history
         self.df_history = pd.DataFrame(index=np.arange(num_epochs), columns=['WER', 'LER', 'ler_raw'])
@@ -110,7 +76,7 @@ class ReportCallback(callbacks.Callback):
             print("shuffling validation data")
             self.data_valid.shuffle_entries()
 
-        print(f'validating epoch {epoch+1} using {self.decoder.decode_strategy} decoding')
+        print(f'validating epoch {epoch+1} using {self.decoder} decoding')
         originals, results = [], []
         self.data_valid.cur_index = 0  # reset index
 
@@ -118,17 +84,35 @@ class ReportCallback(callbacks.Callback):
 
         for _ in tqdm(range(len(self.data_valid))):
             batch_inputs, _ = next(self.data_valid)
-            batch_input = batch_inputs['the_input']
-            batch_input_lengths = batch_inputs['input_length']
-            ground_truths = batch_inputs['source_str']
-            predictions = self.decoder.decode(batch_input, batch_input_lengths)
+            # decoded_res = decode_batch(self.test_func, batch_inputs['the_input'])
+            # print(' '.join(decoded_res))
+            # y_pred_0 = batch_inputs['the_input']
+            # input_length_0 = batch_inputs['input_length']
+            # decoded_res_0 = decode_batch_keras(y_pred_0, input_length_0)
 
-            for ground_truth, prediction in zip(ground_truths, predictions):
+            y_pred = self.test_func([batch_inputs['the_input']])[0]
+            input_length = batch_inputs['input_length']
+            # decoded_res = decode_batch_keras(y_pred, input_length, greedy=True)
+            # print(' '.join(decoded_res))
+            if self.decode_strategy == 'beamsearch':
+                decoded_res = decode_batch_keras(y_pred, input_length, greedy=True)
+            elif self.decode_strategy == 'bestpath':
+                decoded_res = decode_batch_keras(y_pred, input_length, greedy=False)
+            else:
+                decoded_res = decode_batch(self.test_func, batch_inputs['the_input'])
+
+            # print(' '.join(decoded_res))
+
+            # y_pred_3 = self.test_func([batch_inputs['the_input']])[0]
+            # input_length_3 = batch_inputs['input_length']
+            # decoded_res_3 = decode_batch_keras(y_pred_3, input_length_3)
+
+            for ground_truth, prediction in zip(batch_inputs['source_str'], decoded_res):
                 if self.lm and self.lm_vocab:
-                    using_lm = f'({self.decoder.decode_strategy} decoding, using LM)'
+                    using_lm = f'({self.decoder} decoding, using LM)'
                     pred_lm = correction(prediction, self.lm, self.lm_vocab)
                 else:
-                    using_lm = f'({self.decoder.decode_strategy} decoding, not using LM)'
+                    using_lm = f'({self.decoder} decoding, not using LM)'
                     pred_lm = prediction
 
                 ler_pred = ler(ground_truth, prediction)
@@ -186,7 +170,7 @@ class ReportCallback(callbacks.Callback):
         # save checkpoint if last LER or last WER was better than all previous values
         if self.save_progress and self.new_benchmark():
             print(f'New WER or LER benchmark!')
-            save_model(self.model, target_dir=self.target_dir)
+            save_model(self.model, target_dir=self.target_dir, base_name=self.base_name)
 
     def new_benchmark(self):
         """
@@ -209,6 +193,19 @@ class ReportCallback(callbacks.Callback):
         print(f'{last} vs {rest}')
 
         return all(val <= last for val in rest)
+
+
+def decode_batch(test_func, word_batch):
+    ret = []
+    y_pred = test_func([word_batch])[0]  # 16xTIMEx29 = batch x time x classes
+
+    for out in y_pred:
+        best = list(np.argmax(out, axis=1))
+        merge = [k for k, g in itertools.groupby(best)]
+        # outStr = int_to_text_sequence(merge)
+        ret.append(decode(merge))
+
+    return ret
 
 
 def is_last_value_smallest(values):
